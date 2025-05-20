@@ -30,3 +30,19 @@
 *.exe
 *.out
 *.app
+
+# CMake
+CMakeUserPresets.json
+compile_commands.json
+
+# Special Directories
+.cache
+.git
+.DS_Store
+build/
+logs/
+deps/glfw-3.4.bin.MACOS/
+deps/imgui-1.91.9/
+
+# Other save files
+*.ini
