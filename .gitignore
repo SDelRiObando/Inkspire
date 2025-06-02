@@ -41,8 +41,7 @@ compile_commands.json
 .DS_Store
 build/
 logs/
-deps/glfw-3.4.bin.MACOS/
-deps/imgui-1.91.9/
+deps/
 
 # Other save files
 *.ini
