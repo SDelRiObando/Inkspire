@@ -1,0 +1,33 @@
+{
+    "version": 8,
+    "cmakeMinimumRequired": {
+        "major": 3,
+        "minor": 30
+    },
+    "configurePresets": [
+        {
+            "name": "mac-x86-64-debug",
+            "binaryDir": "${sourceDir}/build",
+            "cacheVariables": {
+                "CMAKE_EXPORT_COMPILE_COMMANDS": "ON",
+                "CMAKE_CXX_STANDARD": "23",
+                "CMAKE_CXX_EXTENSIONS": "OFF",
+                "COMPILING_ARGS": "-Wall;-Wextra;-Wpedantic;-Wno-deprecated;-g;-Og",
+                "PLATFORM_GLFW_FOLDER": "glfw-3.4.bin.MACOS",
+                "IS_ON_WINDOWS": "OFF"
+            }
+        },
+        {
+            "name": "mac-x86-64-release",
+            "binaryDir": "${sourceDir}/build",
+            "cacheVariables": {
+                "CMAKE_EXPORT_COMPILE_COMMANDS": "ON",
+                "CMAKE_CXX_STANDARD": "23",
+                "CMAKE_CXX_EXTENSIONS": "OFF",
+                "COMPILING_ARGS": "-Wall;-Wextra;-Wpedantic;-Wno-deprecated;-O2",
+                "PLATFORM_GLFW_FOLDER": "glfw-3.4.bin.MACOS",
+                "IS_ON_WINDOWS": "OFF"
+            }
+        }
+    ]
+}
