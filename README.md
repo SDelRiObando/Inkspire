@@ -2,11 +2,11 @@
 An open-source drawing application
 
 ## Tools & Dependencies
- - A modern C++ compiler
- - clangd LSP
+ - A modern C++ compiler (supports **C++20** to **C++23**)
+ - clangd LSP (for macOS VSC setups)
  - CMake 3.30+ (or latest)
- - OpenGL version ?
- - GLFW 3.3
+ - OpenGL version 3.3 (core?)
+ - GLFW 3.4
  - ImGui v1.91.9
 
 ## Dev References
@@ -26,13 +26,13 @@ An open-source drawing application
     - Ensure the `deps/glad` directory has its files within sub-paths `glad/glad.h` and `KHR/khrplatform.h`, and it finally must have `glad.c` under `deps/glad`.
 
 ### Building on macOS (x86-64):
- - Permit and run the build script: enter `chmod +x ./utility.sh` before `./utility.sh build debug`.
+ - Permit and run the build script: enter `chmod +x ./utility.sh` before `./utility.sh build mac-x86-64-debug`. Use `mac-x86-64-release` for non-debug builds.
  - Test run the app with `./build/src/inkspire`.
  - Optionally, run all tests with `./utility.sh test` from the _project root_.
 
 ### Building on Windows (x86-64):
  - Run these commands:
-   1. `cmake --fresh -S . -B build -DBUILD_MODE:STRING=debug`
+   1. `cmake --fresh -S . -B build --preset win-x86-64-debug` or use `win-x86-64-release` to do non-debug builds.
    2. `cmake --build build`
  - Test run the executable at `./build/src/inkspire.exe`.
  - Optionally, run all tests with `ctest --test-dir build --timeout 3 -V` from the _project root_.
