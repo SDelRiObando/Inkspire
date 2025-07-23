@@ -16,10 +16,6 @@
 *.dylib
 *.dll
 
-# Fortran module files
-*.mod
-*.smod
-
 # Compiled Static libraries
 *.lai
 *.la
@@ -34,14 +30,28 @@
 # CMake
 CMakeUserPresets.json
 compile_commands.json
+CMakeFiles/
+CMakeCache.txt
+cmake_install.cmake
 
 # Special Directories
-.cache
-.git
+.cache/
 .DS_Store
 build/
 logs/
 deps/
 
+# Editor / IDE
+.vscode/
+.idea/
+
 # Other save files
 *.ini
+*.autosave
+*.tmp
+
+# Package Managers (optional)
+vcpkg_installed/
+conan.lock
+build/.conan
+cmake-build-*/
