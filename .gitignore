@@ -26,6 +26,7 @@
 *.exe
 *.out
 *.app
+*.pdb
 
 # CMake
 CMakeUserPresets.json
@@ -33,25 +34,24 @@ compile_commands.json
 CMakeFiles/
 CMakeCache.txt
 cmake_install.cmake
+Testing/
 
 # Special Directories
 .cache/
 .DS_Store
 build/
 logs/
-deps/
+cmake-build-*/
 
 # Editor / IDE
 .vscode/
+.vs/
 .idea/
 
-# Other save files
-*.ini
+# Runtime / save files
+imgui.ini
 *.autosave
 *.tmp
 
 # Package Managers
 vcpkg_installed/
-conan.lock
-build/.conan
-cmake-build-*/

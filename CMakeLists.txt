@@ -1,7 +1,7 @@
 cmake_minimum_required(VERSION 3.21)
 project(inkspire VERSION 0.1.0 LANGUAGES CXX)
 
-set(CMAKE_CXX_STANDARD 17)
+set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
 # Enable folders in IDEs like VSCode/Visual Studio
@@ -14,6 +14,13 @@ file(GLOB_RECURSE SOURCES CONFIGURE_DEPENDS
 
 # Create executable target first
 add_executable(inkspire ${SOURCES})
+
+# Copy assets next to the executable so the app finds them at runtime
+add_custom_command(TARGET inkspire POST_BUILD
+    COMMAND ${CMAKE_COMMAND} -E copy_directory
+        ${CMAKE_SOURCE_DIR}/assets
+        $<TARGET_FILE_DIR:inkspire>/assets
+)
 
 # Let CMake know where to look for headers (after target creation)
 target_include_directories(inkspire PRIVATE ${PROJECT_SOURCE_DIR}/include)

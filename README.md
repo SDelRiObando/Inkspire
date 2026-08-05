@@ -1,38 +1,32 @@
 # Inkspire
-An open-source drawing application
+An open-source drawing application for macOS and Windows.
 
 ## Tools & Dependencies
- - A modern C++ compiler (supports **C++20** to **C++23**)
- - clangd LSP (for macOS VSC setups)
- - CMake 3.30+ (or latest)
- - OpenGL version 3.3 (core?)
- - GLFW 3.4
- - ImGui v1.91.9
+ - A modern C++ compiler (supports **C++20**)
+ - CMake 3.21+
+ - [vcpkg](https://github.com/microsoft/vcpkg) (manifest mode)
+ - SDL2, SDL2_image, SDL2_ttf (installed automatically via vcpkg)
 
 ## Dev References
- - [learncpp.com website](https://www.learncpp.com/)
- - [CMake Tutorial](https://hsf-training.github.io/hsf-training-cmake-webpage/02-building/index.html)
- - [GLFW prepared downloads](https://www.glfw.org/download)
- - [LearnOpenGL website](https://learnopengl.com/)
- - [CMake With ImGui article](https://technotes.blog/2023/05/12/integrating-imgui-with-cmake-a-step-by-step-guide-with-code-examples/)
+ - [SDL2 Wiki](https://wiki.libsdl.org/SDL2/)
+ - [SDL_image docs](https://wiki.libsdl.org/SDL2_image/)
+ - [SDL_ttf docs](https://wiki.libsdl.org/SDL2_ttf/)
+ - [vcpkg manifest mode](https://learn.microsoft.com/en-us/vcpkg/consume/manifest-mode)
 
-## Project Setup:
+## Project Setup
 
-### File Management:
- - Clone the repo with Git.
- - Create the `build/` and `deps/` folders in the project root.
-    - Go to ImGui releases for the zip or tar.gz of v1.91.9, then unzip and drag it under `deps/`.
-    - Go to GLFW releases for pre-compiled-binaries of v3.4, then place it unzipped into `deps/`.
-    - Ensure the `deps/glad` directory has its files within sub-paths `glad/glad.h` and `KHR/khrplatform.h`, and it finally must have `glad.c` under `deps/glad`.
+### Prerequisites
+ - Clone vcpkg and set the `VCPKG_ROOT` environment variable to its path.
+ - macOS: install the Xcode command-line tools with `xcode-select --install`.
 
-### Building on macOS (x86-64):
- - Permit and run the build script: enter `chmod +x ./utility.sh` before `./utility.sh build mac-x86-64-debug`. Use `mac-x86-64-release` for non-debug builds.
- - Test run the app with `./build/src/inkspire`.
- - Optionally, run all tests with `./utility.sh test` from the _project root_.
+### Building on macOS
+ - `cmake --preset mac-x86-64-debug` (or `mac-x86-64-release`)
+ - `cmake --build build`
+ - Run with `./build/src/inkspire`.
+ - Tests: `ctest --test-dir build -V`
 
-### Building on Windows (x86-64):
- - Run these commands:
-   1. `cmake --fresh -S . -B build --preset win-x86-64-debug` or use `win-x86-64-release` to do non-debug builds.
-   2. `cmake --build build`
- - Test run the executable at `./build/src/inkspire.exe`.
- - Optionally, run all tests with `ctest --test-dir build --timeout 3 -V` from the _project root_.
+### Building on Windows
+ - `cmake --preset win-x86-64-debug` (or `win-x86-64-release`)
+ - `cmake --build build`
+ - Run with `./build/src/inkspire.exe`.
+ - Tests: `ctest --test-dir build --timeout 3 -V`
