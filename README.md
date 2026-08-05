@@ -1,6 +1,22 @@
 # Inkspire
 An open-source drawing application for macOS and Windows.
 
+## Features
+ - Brush and eraser tools with adjustable size (preset sizes + fine slider)
+ - Round, variable-thickness strokes
+ - HSV color wheel with a brightness slider
+ - Saveable color swatches for quick reuse
+ - True paint-buildup brush opacity — a single stroke stays even, while
+   overlapping strokes accumulate like real ink
+ - Fixed canvas in a workspace, with a full-height tool panel
+ - Resizable window and fullscreen mode (F11)
+ - Drawing is preserved across window resizing
+
+## Controls
+ - **B** — brush, **E** — eraser
+ - **F11** — toggle fullscreen
+ - Click and drag on the canvas to draw
+
 ## Tools & Dependencies
  - A modern C++ compiler (supports **C++20**)
  - CMake 3.21+
