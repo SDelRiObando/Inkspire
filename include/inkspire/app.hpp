@@ -2,6 +2,7 @@
 #include "canvas.hpp"
 #include "menu.hpp"
 #include "toolpanel.hpp"
+#include "colorpicker.hpp"
 #include <SDL.h>
 #include <memory>
 
@@ -40,6 +41,9 @@ namespace Inkspire
         int windowW = 800;
         int windowH = 600;
         bool fullscreen = false;
+
+        ColorPicker bgPicker;
+        bool bgPopupOpen = false;
 
         // Where the top-left of the paper sits within the window
         int canvasX = 0;

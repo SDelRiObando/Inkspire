@@ -1,6 +1,8 @@
 #pragma once
 
 #include <SDL.h>
+#include <vector>
+#include <string>
 
 namespace Inkspire
 {
@@ -10,6 +12,21 @@ namespace Inkspire
         Eraser
     };
 
+    struct Layer
+    {
+        enum class Kind
+        {
+            Background,
+            Drawing
+        };
+        Kind kind = Kind::Drawing;
+
+        SDL_Texture *texture = nullptr;           // Drawing layers
+        SDL_Color bgColor = {255, 255, 255, 255}; // Background layers
+        bool visible = true;
+        std::string name;
+    };
+
     class Canvas
     {
     public:
@@ -17,14 +34,11 @@ namespace Inkspire
         ~Canvas();
 
         bool init(SDL_Renderer *renderer, int width, int height);
-        void clear();
+        void clear(); // clears the active drawing layer
 
-        // Brush stroke lifecycle (scratch-buffer for true opacity buildup)
         void beginStroke();
         void strokeLine(int x1, int y1, int x2, int y2, int size, SDL_Color color);
         void commitStroke(float opacity);
-
-        // Eraser stays direct
         void drawLine(int x1, int y1, int x2, int y2, Tool tool, int size, SDL_Color color = {0, 0, 0, 255});
 
         void renderCheckerboard(SDL_Renderer *renderer, const SDL_Rect &dst);
@@ -33,13 +47,24 @@ namespace Inkspire
 
         void preserveAcrossResize();
 
+        // Layer controls
+        int layerCount() const { return (int)layers.size(); }
+        void setActiveLayer(int i);
+        int getActiveLayer() const { return activeLayer; }
+        void toggleVisible(int i);
+        void setBackgroundColor(SDL_Color c);
+        bool activeIsDrawable() const;
+
     private:
-        bool createTexture();
+        bool createDrawingTexture(SDL_Texture *&tex);
         bool createStrokeTexture();
         void fillCircle(int cx, int cy, int radius);
+        SDL_Texture *activeTexture(); // convenience
 
-        SDL_Texture *texture = nullptr;
-        SDL_Texture *strokeTex = nullptr; // scratch buffer for the active stroke
+        std::vector<Layer> layers;
+        int activeLayer = 1; // index 0 is the background
+        SDL_Texture *strokeTex = nullptr;
+
         int width = 0;
         int height = 0;
         SDL_Renderer *renderer = nullptr;

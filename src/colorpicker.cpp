@@ -55,6 +55,10 @@ namespace Inkspire
     {
         this->font = font;
         current = hsvToRgb(hue, sat, val);
+
+        // Start with black and white swatches (pure white is hard to hit on the wheel)
+        swatches.push_back({0, 0, 0, 255});       // black
+        swatches.push_back({255, 255, 255, 255}); // white
     }
 
     void ColorPicker::rebuildWheel(SDL_Renderer *renderer)
@@ -196,7 +200,7 @@ namespace Inkspire
         return false;
     }
 
-    int ColorPicker::render(SDL_Renderer *renderer, int x, int y, int width)
+    int ColorPicker::render(SDL_Renderer *renderer, int x, int y, int width, bool showSwatches, bool showPlus)
     {
         // Wheel + value slider side by side
         int sliderW = 16;
@@ -247,34 +251,47 @@ namespace Inkspire
         SDL_SetRenderDrawColor(renderer, 90, 90, 95, 255);
         SDL_RenderDrawRect(renderer, &preview);
 
-        plusRect = {x + 48, cursorY, 24, 24};
-        SDL_SetRenderDrawColor(renderer, 60, 60, 65, 255);
-        SDL_RenderFillRect(renderer, &plusRect);
-        SDL_SetRenderDrawColor(renderer, 200, 200, 200, 255);
-        // draw a + sign
-        SDL_RenderDrawLine(renderer, plusRect.x + 12, plusRect.y + 5, plusRect.x + 12, plusRect.y + 19);
-        SDL_RenderDrawLine(renderer, plusRect.x + 5, plusRect.y + 12, plusRect.x + 19, plusRect.y + 12);
-
-        cursorY += 34;
-
-        // Swatches grid
-        int sw = 22, sh = 22, sgap = 6, perRow = width / (sw + sgap);
-        if (perRow < 1)
-            perRow = 1;
-        swatchRects.clear();
-        for (size_t i = 0; i < swatches.size(); ++i)
+        if (showSwatches)
         {
-            int col = (int)i % perRow;
-            int row = (int)i / perRow;
-            SDL_Rect r = {x + col * (sw + sgap), cursorY + row * (sh + sgap), sw, sh};
-            swatchRects.push_back(r);
-            SDL_SetRenderDrawColor(renderer, swatches[i].r, swatches[i].g, swatches[i].b, 255);
-            SDL_RenderFillRect(renderer, &r);
-            SDL_SetRenderDrawColor(renderer, 90, 90, 95, 255);
-            SDL_RenderDrawRect(renderer, &r);
+            if (showPlus)
+            {
+                plusRect = {x + 48, cursorY, 24, 24};
+                SDL_SetRenderDrawColor(renderer, 60, 60, 65, 255);
+                SDL_RenderFillRect(renderer, &plusRect);
+                SDL_SetRenderDrawColor(renderer, 200, 200, 200, 255);
+                SDL_RenderDrawLine(renderer, plusRect.x + 12, plusRect.y + 5, plusRect.x + 12, plusRect.y + 19);
+                SDL_RenderDrawLine(renderer, plusRect.x + 5, plusRect.y + 12, plusRect.x + 19, plusRect.y + 12);
+            }
+            else
+            {
+                plusRect = {0, 0, 0, 0}; // no clickable plus
+            }
+
+            cursorY += 34;
+
+            // Swatches grid
+            int sw = 22, sh = 22, sgap = 6, perRow = width / (sw + sgap);
+            if (perRow < 1)
+                perRow = 1;
+            swatchRects.clear();
+            for (size_t i = 0; i < swatches.size(); ++i)
+            {
+                int col = (int)i % perRow;
+                int row = (int)i / perRow;
+                SDL_Rect r = {x + col * (sw + sgap), cursorY + row * (sh + sgap), sw, sh};
+                swatchRects.push_back(r);
+                SDL_SetRenderDrawColor(renderer, swatches[i].r, swatches[i].g, swatches[i].b, 255);
+                SDL_RenderFillRect(renderer, &r);
+                SDL_SetRenderDrawColor(renderer, 90, 90, 95, 255);
+                SDL_RenderDrawRect(renderer, &r);
+            }
+            int rows = swatches.empty() ? 0 : ((int)swatches.size() - 1) / perRow + 1;
+            cursorY += rows * (sh + sgap) + 8;
         }
-        int rows = swatches.empty() ? 0 : ((int)swatches.size() - 1) / perRow + 1;
-        cursorY += rows * (sh + sgap) + 8;
+        else
+        {
+            cursorY += 34;
+        }
 
         return cursorY;
     }

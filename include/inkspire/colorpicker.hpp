@@ -12,7 +12,7 @@ namespace Inkspire
         void init(TTF_Font *font);
 
         // Lay out and draw within the given top-left area; returns the y below the picker
-        int render(SDL_Renderer *renderer, int x, int y, int width);
+        int render(SDL_Renderer *renderer, int x, int y, int width, bool showSwatches = true, bool showPlus = true);
 
         // Returns true if the event was consumed
         bool handleEvent(const SDL_Event &e);

@@ -90,6 +90,9 @@ namespace Inkspire
                      { toggleFullscreen(); });
 
         toolPanel.init(font, menuBar.height());
+
+        bgPicker.init(font);
+
         recenterCanvas();
         return true;
     }
@@ -159,11 +162,13 @@ namespace Inkspire
         while (SDL_PollEvent(&e))
         {
             if (e.type == SDL_QUIT)
+            {
                 running = false;
+                continue;
+            }
 
             if (e.type == SDL_WINDOWEVENT && e.window.event == SDL_WINDOWEVENT_SIZE_CHANGED)
             {
-
                 windowW = e.window.data1;
                 windowH = e.window.data2;
                 if (canvas)
@@ -179,14 +184,32 @@ namespace Inkspire
             if (toolPanel.handleEvent(e))
                 continue;
 
-            else if (e.type == SDL_KEYDOWN)
+            if (bgPopupOpen && e.type != SDL_KEYDOWN)
             {
-                if (e.key.keysym.sym == SDLK_b)
+                bgPicker.handleEvent(e);
+                canvas->setBackgroundColor(bgPicker.color());
+                continue;
+            }
+
+            if (e.type == SDL_KEYDOWN)
+            {
+                SDL_Keycode k = e.key.keysym.sym;
+                if (k == SDLK_b)
                     currentTool = Tool::Brush;
-                else if (e.key.keysym.sym == SDLK_e)
+                else if (k == SDLK_e)
                     currentTool = Tool::Eraser;
-                else if (e.key.keysym.sym == SDLK_F11)
+                else if (k == SDLK_F11)
                     toggleFullscreen();
+                else if (k == SDLK_g)
+                {
+                    if (bgPopupOpen)
+                        canvas->setBackgroundColor(bgPicker.color());
+                    bgPopupOpen = !bgPopupOpen;
+                }
+                else if (k == SDLK_h)
+                    canvas->toggleVisible(canvas->getActiveLayer());
+                else if (k >= SDLK_1 && k <= SDLK_9)
+                    canvas->setActiveLayer(k - SDLK_1);
             }
             else if (e.type == SDL_MOUSEBUTTONDOWN && e.button.button == SDL_BUTTON_LEFT)
             {
@@ -247,6 +270,33 @@ namespace Inkspire
 
         toolPanel.render(renderer, windowH);
         menuBar.render(renderer);
+
+        // Background Color Picker
+        if (bgPopupOpen)
+        {
+            int pw = 200, ph = 280;
+            int px = windowW / 2 - pw / 2;
+            int py = windowH / 2 - ph / 2;
+            SDL_SetRenderDrawColor(renderer, 45, 45, 50, 255);
+            SDL_Rect panel = {px, py, pw, ph};
+            SDL_RenderFillRect(renderer, &panel);
+            SDL_SetRenderDrawColor(renderer, 100, 100, 105, 255);
+            SDL_RenderDrawRect(renderer, &panel);
+
+            // Title
+            SDL_Color white = {230, 230, 230, 255};
+            SDL_Surface *surf = TTF_RenderText_Blended(font, "Background Color", white);
+            if (surf)
+            {
+                SDL_Texture *tex = SDL_CreateTextureFromSurface(renderer, surf);
+                SDL_Rect dst = {px + 12, py + 10, surf->w, surf->h};
+                SDL_RenderCopy(renderer, tex, nullptr, &dst);
+                SDL_DestroyTexture(tex);
+                SDL_FreeSurface(surf);
+            }
+
+            bgPicker.render(renderer, px + 12, py + 60, pw - 24, true, false);
+        }
         SDL_RenderPresent(renderer);
     }
 
