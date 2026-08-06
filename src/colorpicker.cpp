@@ -54,11 +54,8 @@ namespace Inkspire
     void ColorPicker::init(TTF_Font *font)
     {
         this->font = font;
-        current = hsvToRgb(hue, sat, val);
-
         // Start with black and white swatches (pure white is hard to hit on the wheel)
-        swatches.push_back({0, 0, 0, 255});       // black
-        swatches.push_back({255, 255, 255, 255}); // white
+        resetSwatches(); // seed default black + white
     }
 
     void ColorPicker::rebuildWheel(SDL_Renderer *renderer)
@@ -200,6 +197,18 @@ namespace Inkspire
         return false;
     }
 
+    void ColorPicker::resetSwatches()
+    {
+        swatches.clear();
+        swatches.push_back({0, 0, 0, 255});       // black
+        swatches.push_back({255, 255, 255, 255}); // white
+
+        hue = 0.0f;
+        sat = 0.0f;
+        val = 0.0f;
+        current = hsvToRgb(hue, sat, val);
+    }
+
     int ColorPicker::render(SDL_Renderer *renderer, int x, int y, int width, bool showSwatches, bool showPlus)
     {
         // Wheel + value slider side by side
@@ -244,7 +253,7 @@ namespace Inkspire
 
         int cursorY = y + wheelSize + 12;
 
-        // Current color preview + plus button
+        // Current color preview
         SDL_Rect preview = {x, cursorY, 40, 24};
         SDL_SetRenderDrawColor(renderer, current.r, current.g, current.b, 255);
         SDL_RenderFillRect(renderer, &preview);
@@ -253,6 +262,7 @@ namespace Inkspire
 
         if (showSwatches)
         {
+            // add button
             if (showPlus)
             {
                 plusRect = {x + 48, cursorY, 24, 24};

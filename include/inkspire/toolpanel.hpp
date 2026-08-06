@@ -3,8 +3,8 @@
 #include <SDL.h>
 #include <SDL_ttf.h>
 #include <string>
-#include "inkspire/canvas.hpp" // for Tool
-#include "inkspire/colorpicker.hpp"
+#include "canvas.hpp" // for Tool
+#include "colorpicker.hpp"
 
 namespace Inkspire
 {
@@ -20,6 +20,10 @@ namespace Inkspire
         int brushSize() const { return currentTool == Tool::Brush ? brushSz : eraserSz; }
         int width() const { return panelW; }
         int flyoutWidth() const { return flyoutOpen ? flyoutW : 0; }
+
+        const std::vector<SDL_Color> &getSwatches() const { return picker.getSwatches(); }
+        void setSwatches(const std::vector<SDL_Color> &s) { picker.setSwatches(s); }
+        void resetSwatches() { picker.resetSwatches(); }
 
         float brushOpacity() const { return opacity; }
         SDL_Color brushColor() const { return picker.color(); }

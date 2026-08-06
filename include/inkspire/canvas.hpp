@@ -43,14 +43,25 @@ namespace Inkspire
 
         void renderCheckerboard(SDL_Renderer *renderer, const SDL_Rect &dst);
         void render(SDL_Renderer *renderer, const SDL_Rect &dst, float strokeOpacity, bool strokeActive);
+        void reset(); // File > New: discard all layers, restore default document
         void shutdown();
 
         void preserveAcrossResize();
 
         // Layer controls
+        void addLayer();         // new drawing layer above the active one
+        void deleteLayer(int i); // remove layer i (guards background & last drawing layer)
+        const std::vector<Layer> &getLayers() const { return layers; }
+
         int layerCount() const { return (int)layers.size(); }
         void setActiveLayer(int i);
         int getActiveLayer() const { return activeLayer; }
+        int getWidth() const { return width; }
+        int getHeight() const { return height; }
+        SDL_Color getBackgroundColor() const;
+        SDL_Surface *readLayerPixels(int i); // caller frees; nullptr for non-drawing layers
+        SDL_Texture *makeLayerTextureFromSurface(SDL_Surface *surf);
+        void loadLayers(std::vector<Layer> newLayers, int activeIdx, SDL_Color bgColor);
         void toggleVisible(int i);
         void setBackgroundColor(SDL_Color c);
         bool activeIsDrawable() const;

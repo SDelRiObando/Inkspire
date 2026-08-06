@@ -17,6 +17,11 @@ namespace Inkspire
         // Returns true if the event was consumed
         bool handleEvent(const SDL_Event &e);
 
+        const std::vector<SDL_Color> &getSwatches() const { return swatches; }
+        void setSwatches(const std::vector<SDL_Color> &s) { swatches = s; }
+
+        void resetSwatches();
+
         SDL_Color color() const { return current; } // alpha handled by stroke commit now
     private:
         void rebuildWheel(SDL_Renderer *renderer);

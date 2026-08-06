@@ -36,10 +36,16 @@ endif()
 find_package(SDL2 CONFIG REQUIRED)
 find_package(SDL2_image CONFIG REQUIRED)
 find_package(SDL2_ttf CONFIG REQUIRED)
+find_package(miniz CONFIG REQUIRED)
+find_package(nlohmann_json CONFIG REQUIRED)
+find_package(tinyfiledialogs CONFIG REQUIRED)
 
 target_link_libraries(inkspire PRIVATE
   SDL2::SDL2
   SDL2::SDL2main
   SDL2_image::SDL2_image
   SDL2_ttf::SDL2_ttf
+  miniz::miniz
+  nlohmann_json::nlohmann_json
+  tinyfiledialogs::tinyfiledialogs
 )

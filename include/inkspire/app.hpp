@@ -3,6 +3,7 @@
 #include "menu.hpp"
 #include "toolpanel.hpp"
 #include "colorpicker.hpp"
+#include "layerspanel.hpp"
 #include <SDL.h>
 #include <memory>
 
@@ -22,9 +23,12 @@ namespace Inkspire
         void handle_events(bool &running);
         void update();
         void render();
+        void updateWindowTitle();
         void recenterCanvas();
         void toggleFullscreen();
         bool screenToCanvas(int sx, int sy, int &cx, int &cy) const;
+        void saveCurrent(); // quick-save to currentFilePath, or Save As if none
+        void saveAs();      // always prompt
 
         SDL_Window *window = nullptr;
         SDL_Renderer *renderer = nullptr;
@@ -42,6 +46,8 @@ namespace Inkspire
         int windowH = 600;
         bool fullscreen = false;
 
+        LayersPanel layersPanel;
+
         ColorPicker bgPicker;
         bool bgPopupOpen = false;
 
@@ -52,6 +58,9 @@ namespace Inkspire
         // Fixed paper dimensions
         int canvasW = 800;
         int canvasH = 600;
+
+        // File path
+        std::string currentFilePath; // empty = no file yet (untitled)
 
         bool quit = false;
         bool drawing = false;

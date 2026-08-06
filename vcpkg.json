@@ -4,7 +4,10 @@
   "dependencies": [
     "sdl2",
     "sdl2-image",
-    "sdl2-ttf"
+    "sdl2-ttf",
+    "miniz",
+    "nlohmann-json",
+    "tinyfiledialogs"
   ],
   "builtin-baseline": "7bc2cb97d8410e34f6733642ae954bf5a253a6b5"
 }

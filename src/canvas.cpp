@@ -227,6 +227,165 @@ namespace Inkspire
         SDL_RenderSetClipRect(renderer, nullptr);
     }
 
+    void Canvas::addLayer()
+    {
+        Layer L;
+        L.kind = Layer::Kind::Drawing;
+        L.name = "Layer " + std::to_string(layers.size());
+        if (!createDrawingTexture(L.texture))
+            return;
+
+        // Insert just above the active layer
+        int insertAt = activeLayer + 1;
+        if (insertAt > (int)layers.size())
+            insertAt = (int)layers.size();
+        layers.insert(layers.begin() + insertAt, L);
+        activeLayer = insertAt; // make the new layer active
+    }
+
+    void Canvas::deleteLayer(int i)
+    {
+        if (i < 0 || i >= (int)layers.size())
+            return;
+        if (layers[i].kind == Layer::Kind::Background)
+            return; // never delete background
+
+        // Count drawing layers — don't delete the last one
+        int drawingCount = 0;
+        for (auto &L : layers)
+            if (L.kind == Layer::Kind::Drawing)
+                drawingCount++;
+        if (drawingCount <= 1)
+            return;
+
+        if (layers[i].texture)
+            SDL_DestroyTexture(layers[i].texture);
+        layers.erase(layers.begin() + i);
+
+        // Fix up activeLayer so it still points at a valid drawing layer
+        if (activeLayer >= (int)layers.size())
+            activeLayer = (int)layers.size() - 1;
+        if (activeLayer >= 0 && layers[activeLayer].kind != Layer::Kind::Drawing)
+        {
+            // find nearest drawing layer
+            for (int j = (int)layers.size() - 1; j >= 0; --j)
+                if (layers[j].kind == Layer::Kind::Drawing)
+                {
+                    activeLayer = j;
+                    break;
+                }
+        }
+    }
+
+    SDL_Color Canvas::getBackgroundColor() const
+    {
+        for (const auto &L : layers)
+            if (L.kind == Layer::Kind::Background)
+                return L.bgColor;
+        return {255, 255, 255, 255};
+    }
+
+    SDL_Surface *Canvas::readLayerPixels(int i)
+    {
+        if (i < 0 || i >= (int)layers.size())
+            return nullptr;
+        if (layers[i].kind != Layer::Kind::Drawing || !layers[i].texture)
+            return nullptr;
+
+        SDL_Surface *surf = SDL_CreateRGBSurfaceWithFormat(0, width, height, 32, SDL_PIXELFORMAT_RGBA8888);
+        if (!surf)
+            return nullptr;
+
+        SDL_SetRenderTarget(renderer, layers[i].texture);
+        SDL_RenderReadPixels(renderer, nullptr, SDL_PIXELFORMAT_RGBA8888, surf->pixels, surf->pitch);
+        SDL_SetRenderTarget(renderer, nullptr);
+        return surf;
+    }
+
+    SDL_Texture *Canvas::makeLayerTextureFromSurface(SDL_Surface *surf)
+    {
+        // Create a target texture and copy the surface into it
+        SDL_Texture *tex = nullptr;
+        if (!createDrawingTexture(tex))
+            return nullptr;
+
+        SDL_Texture *fromSurf = SDL_CreateTextureFromSurface(renderer, surf);
+        if (fromSurf)
+        {
+            SDL_SetTextureBlendMode(fromSurf, SDL_BLENDMODE_NONE);
+            SDL_SetRenderTarget(renderer, tex);
+            SDL_SetRenderDrawBlendMode(renderer, SDL_BLENDMODE_NONE);
+            SDL_SetRenderDrawColor(renderer, 0, 0, 0, 0);
+            SDL_RenderClear(renderer);
+            SDL_RenderCopy(renderer, fromSurf, nullptr, nullptr);
+            SDL_SetRenderTarget(renderer, nullptr);
+            SDL_DestroyTexture(fromSurf);
+        }
+        return tex;
+    }
+
+    void Canvas::loadLayers(std::vector<Layer> newLayers, int activeIdx, SDL_Color bgColor)
+    {
+        // Destroy current layer textures
+        for (auto &L : layers)
+            if (L.texture)
+            {
+                SDL_DestroyTexture(L.texture);
+                L.texture = nullptr;
+            }
+        layers.clear();
+
+        layers = std::move(newLayers);
+
+        // Apply background color to the background layer
+        for (auto &L : layers)
+            if (L.kind == Layer::Kind::Background)
+                L.bgColor = bgColor;
+
+        // Clamp active layer to a valid drawing layer
+        activeLayer = activeIdx;
+        if (activeLayer < 0 || activeLayer >= (int)layers.size() ||
+            layers[activeLayer].kind != Layer::Kind::Drawing)
+        {
+            for (int j = (int)layers.size() - 1; j >= 0; --j)
+                if (layers[j].kind == Layer::Kind::Drawing)
+                {
+                    activeLayer = j;
+                    break;
+                }
+        }
+
+        beginStroke();
+    }
+
+    void Canvas::reset()
+    {
+        // Destroy all existing layer textures
+        for (auto &L : layers)
+            if (L.texture)
+            {
+                SDL_DestroyTexture(L.texture);
+                L.texture = nullptr;
+            }
+        layers.clear();
+
+        // Rebuild the default document: white background + one drawing layer
+        Layer bg;
+        bg.kind = Layer::Kind::Background;
+        bg.bgColor = {255, 255, 255, 255};
+        bg.name = "Background";
+        layers.push_back(bg);
+
+        Layer draw;
+        draw.kind = Layer::Kind::Drawing;
+        draw.name = "Layer 1";
+        createDrawingTexture(draw.texture);
+        layers.push_back(draw);
+
+        activeLayer = 1;
+        beginStroke(); // clear any in-progress scratch
+    }
+
     void Canvas::render(SDL_Renderer *renderer, const SDL_Rect &dst, float strokeOpacity, bool strokeActive)
     {
         for (size_t i = 0; i < layers.size(); ++i)

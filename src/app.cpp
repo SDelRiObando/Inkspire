@@ -1,5 +1,7 @@
 #include "inkspire/app.hpp"
 #include "inkspire/canvas.hpp"
+#include "inkspire/project.hpp"
+#include <tinyfiledialogs.h>
 #include <iostream>
 
 namespace Inkspire
@@ -69,11 +71,36 @@ namespace Inkspire
         menuBar.init(font);
         Menu &file = menuBar.addMenu("File");
         file.addItem("New", [this]()
-                     { canvas->clear(); });
-        file.addItem("Save", []()
-                     { std::cout << "TODO: Save\n"; });
-        file.addItem("Open", []()
-                     { std::cout << "TODO: Open\n"; });
+                     { canvas->reset();
+                       toolPanel.resetSwatches();
+                       currentFilePath.clear();
+                       updateWindowTitle(); });
+        file.addItem("Save", [this]()
+                     { saveCurrent(); });
+        file.addItem("Save As", [this]()
+                     { saveAs(); });
+        file.addItem("Open", [this]()
+                     {
+                         const char *filters[1] = { "*.inks" };
+                         const char *path = tinyfd_openFileDialog(
+                             "Open Project",
+                             "",
+                             1,
+                             filters,
+                             "Inkspire Project",
+                             0); // 0 = single file
+                         if (path)
+                         {
+                            std::vector<SDL_Color> loadedSwatches;
+                            if (loadProject(*canvas, renderer, loadedSwatches, path))
+                            {
+                                toolPanel.setSwatches(loadedSwatches);
+                                currentFilePath = path;
+                                updateWindowTitle();
+                            }
+                            else
+                                std::cerr << "Open failed\n";
+                         } });
         file.addItem("Exit", [this]()
                      { quit = true; });
 
@@ -90,10 +117,13 @@ namespace Inkspire
                      { toggleFullscreen(); });
 
         toolPanel.init(font, menuBar.height());
+        layersPanel.init(font, menuBar.height());
 
         bgPicker.init(font);
 
         recenterCanvas();
+
+        updateWindowTitle();
         return true;
     }
 
@@ -123,13 +153,61 @@ namespace Inkspire
         SDL_Quit();
     }
 
+    void App::saveAs()
+    {
+        const char *filters[1] = {"*.inks"};
+        const char *path = tinyfd_saveFileDialog(
+            "Save Project As", "untitled.inks", 1, filters, "Inkspire Project");
+        if (path)
+        {
+            if (saveProject(*canvas, renderer, toolPanel.getSwatches(), path))
+            {
+                currentFilePath = path; // this file is now "the current file"
+                updateWindowTitle();
+            }
+            else
+                std::cerr << "Save failed\n";
+        }
+    }
+
+    void App::saveCurrent()
+    {
+        if (currentFilePath.empty())
+        {
+            saveAs(); // no file yet — behave like Save As
+            return;
+        }
+        // Quick-save: no dialog, reuse the known path
+        if (!saveProject(*canvas, renderer, toolPanel.getSwatches(), currentFilePath))
+            std::cerr << "Save failed\n";
+    }
+
+    void App::updateWindowTitle()
+    {
+        std::string title = "Inkspire — ";
+        if (currentFilePath.empty())
+        {
+            title += "Untitled";
+        }
+        else
+        {
+            // Extract just the filename from the full path
+            size_t slash = currentFilePath.find_last_of("/\\");
+            std::string name = (slash == std::string::npos)
+                                   ? currentFilePath
+                                   : currentFilePath.substr(slash + 1);
+            title += name;
+        }
+        SDL_SetWindowTitle(window, title.c_str());
+    }
+
     void App::recenterCanvas()
     {
         int barH = menuBar.height();
         int leftUsed = toolPanel.width() + toolPanel.flyoutWidth();
-        int availW = windowW - leftUsed;
+        int rightUsed = layersPanel.width();
+        int availW = windowW - leftUsed - rightUsed;
 
-        // Center if there's room; otherwise pin to the right of the panel/flyout
         if (availW > canvasW)
             canvasX = leftUsed + (availW - canvasW) / 2;
         else
@@ -182,6 +260,9 @@ namespace Inkspire
                 continue;
 
             if (toolPanel.handleEvent(e))
+                continue;
+
+            if (layersPanel.handleEvent(e, *canvas, windowW))
                 continue;
 
             if (bgPopupOpen && e.type != SDL_KEYDOWN)
@@ -269,6 +350,7 @@ namespace Inkspire
         }
 
         toolPanel.render(renderer, windowH);
+        layersPanel.render(renderer, *canvas, windowW, windowH);
         menuBar.render(renderer);
 
         // Background Color Picker
