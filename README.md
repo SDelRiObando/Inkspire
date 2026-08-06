@@ -1,48 +1,132 @@
 # Inkspire
-An open-source drawing application for macOS and Windows.
+
+An open-source digital drawing application for **macOS** and **Windows**, built with modern **C++20** and **SDL2**. Inkspire provides a clean, panel-based workspace for sketching and painting with support for layers, customizable tools, and an intuitive editing workflow.
 
 ## Features
- - Brush and eraser tools with adjustable size (preset sizes + fine slider)
- - Round, variable-thickness strokes
- - HSV color wheel with a brightness slider
- - Saveable color swatches for quick reuse
- - True paint-buildup brush opacity — a single stroke stays even, while
-   overlapping strokes accumulate like real ink
- - Fixed canvas in a workspace, with a full-height tool panel
- - Resizable window and fullscreen mode (F11)
- - Drawing is preserved across window resizing
+
+### Drawing
+
+* Brush and Eraser tools selectable from the **Tools** panel
+* Adjustable brush size with preset sizes and fine-grained controls
+* Smooth, round, variable-thickness brush strokes
+* True paint-buildup brush opacity—individual strokes remain consistent while overlapping strokes naturally accumulate like real ink
+
+### Colors
+
+* HSV color wheel with brightness slider
+* Saveable color swatches for quick color selection
+
+### Layers
+
+* Dedicated **Layers** panel
+* Toggle the active layer's visibility with **H**
+
+### Workspace
+
+* Modern panel-based interface
+* **Tools** panel for selecting drawing tools
+* **Tool Options** panel for configuring the active tool
+* **Layers** panel for managing artwork
+* Fixed canvas within a resizable workspace
+* Drawing is preserved while resizing the window
+* Fullscreen mode
+
+### Editing & Navigation
+
+* Undo and Redo
+* Mouse wheel zoom
+* Keyboard zoom shortcuts
+* Space-bar panning
+* Resizable window
 
 ## Controls
- - **B** — brush, **E** — eraser
- - **F11** — toggle fullscreen
- - Click and drag on the canvas to draw
 
-## Tools & Dependencies
- - A modern C++ compiler (supports **C++20**)
- - CMake 3.21+
- - [vcpkg](https://github.com/microsoft/vcpkg) (manifest mode)
- - SDL2, SDL2_image, SDL2_ttf (installed automatically via vcpkg)
+| Action                          | Control                              |
+| ------------------------------- | ------------------------------------ |
+| Select a tool                   | Click an icon in the **Tools** panel |
+| Draw                            | Left-click and drag on the canvas    |
+| Pan canvas                      | Hold **Space** and drag              |
+| Zoom                            | Mouse scroll wheel                   |
+| Zoom in                         | **Ctrl + +**                         |
+| Zoom out                        | **Ctrl + -**                         |
+| Undo                            | **Ctrl + Z** or **Edit → Undo**      |
+| Redo                            | **Ctrl + Y** or **Edit → Redo**      |
+| Toggle current layer visibility | **H**                                |
+| Toggle fullscreen               | **F11**                              |
 
-## Dev References
- - [SDL2 Wiki](https://wiki.libsdl.org/SDL2/)
- - [SDL_image docs](https://wiki.libsdl.org/SDL2_image/)
- - [SDL_ttf docs](https://wiki.libsdl.org/SDL2_ttf/)
- - [vcpkg manifest mode](https://learn.microsoft.com/en-us/vcpkg/consume/manifest-mode)
+## Technologies
 
-## Project Setup
+* Modern **C++20**
+* **SDL2**
+* **SDL2_image**
+* **SDL2_ttf**
+* **CMake 3.21+**
+* **vcpkg** (Manifest Mode)
 
-### Prerequisites
- - Clone vcpkg and set the `VCPKG_ROOT` environment variable to its path.
- - macOS: install the Xcode command-line tools with `xcode-select --install`.
+## Prerequisites
 
-### Building on macOS
- - `cmake --preset mac-x86-64-debug` (or `mac-x86-64-release`)
- - `cmake --build build`
- - Run with `./build/src/inkspire`.
- - Tests: `ctest --test-dir build -V`
+* C++20-compatible compiler
+* CMake 3.21 or newer
+* vcpkg configured in Manifest Mode
 
-### Building on Windows
- - `cmake --preset win-x86-64-debug` (or `win-x86-64-release`)
- - `cmake --build build`
- - Run with `./build/src/inkspire.exe`.
- - Tests: `ctest --test-dir build --timeout 3 -V`
+Clone vcpkg and set the `VCPKG_ROOT` environment variable to its installation directory.
+
+On macOS, install the Xcode Command Line Tools:
+
+```bash
+xcode-select --install
+```
+
+## Building
+
+### macOS
+
+```bash
+cmake --preset mac-x86-64-debug
+cmake --build build
+./build/src/inkspire
+```
+
+Run tests:
+
+```bash
+ctest --test-dir build -V
+```
+
+### Windows
+
+```powershell
+cmake --preset win-x86-64-debug
+cmake --build build
+.\build\src\inkspire.exe
+```
+
+Run tests:
+
+```powershell
+ctest --test-dir build --timeout 3 -V
+```
+
+## Development References
+
+* SDL2 Wiki: https://wiki.libsdl.org/SDL2/
+* SDL2_image Documentation: https://wiki.libsdl.org/SDL2_image/
+* SDL2_ttf Documentation: https://wiki.libsdl.org/SDL2_ttf/
+* vcpkg Manifest Mode: https://learn.microsoft.com/en-us/vcpkg/consume/manifest-mode
+
+## Roadmap
+
+Planned features include:
+
+* Additional drawing tools
+* Layer transformations
+* Selection tools
+* Brush presets
+* Keyboard shortcut customization
+* More advanced canvas navigation
+* Export improvements
+* Performance optimizations
+
+## License
+
+This project is open source. See the repository's license for details.
