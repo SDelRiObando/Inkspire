@@ -3,6 +3,7 @@
 #include "inkspire/project.hpp"
 #include <tinyfiledialogs.h>
 #include <iostream>
+#include <algorithm>
 
 namespace Inkspire
 {
@@ -30,6 +31,11 @@ namespace Inkspire
         }
 
         SDL_SetHint(SDL_HINT_RENDER_DRIVER, "opengl"); // <-- add this line
+
+        // Crisp, blocky pixels when zoomed in (nearest-neighbor sampling), the
+        // expected default for a drawing app. Must be set before textures are
+        // created so they inherit it.
+        SDL_SetHint(SDL_HINT_RENDER_SCALE_QUALITY, "0");
 
         renderer = SDL_CreateRenderer(window, -1, SDL_RENDERER_ACCELERATED | SDL_RENDERER_TARGETTEXTURE);
         if (!renderer)
@@ -114,6 +120,12 @@ namespace Inkspire
                        canvas->clear(); });
 
         Menu &view = menuBar.addMenu("View");
+        view.addItem("Zoom In", [this]()
+                     { zoomInAtCenter(); });
+        view.addItem("Zoom Out", [this]()
+                     { zoomOutAtCenter(); });
+        view.addItem("Reset Zoom", [this]()
+                     { resetZoom(); });
         view.addItem("Toggle Fullscreen", [this]()
                      { toggleFullscreen(); });
 
@@ -202,6 +214,9 @@ namespace Inkspire
         SDL_SetWindowTitle(window, title.c_str());
     }
 
+    int App::scaledCanvasW() const { return (int)(canvasW * zoom + 0.5f); }
+    int App::scaledCanvasH() const { return (int)(canvasH * zoom + 0.5f); }
+
     void App::recenterCanvas()
     {
         int barH = menuBar.height();
@@ -209,16 +224,42 @@ namespace Inkspire
         int rightUsed = layersPanel.width();
         int availW = windowW - leftUsed - rightUsed;
 
-        if (availW > canvasW)
-            canvasX = leftUsed + (availW - canvasW) / 2;
+        int sw = scaledCanvasW();
+        int sh = scaledCanvasH();
+
+        if (availW > sw)
+            canvasX = leftUsed + (availW - sw) / 2;
         else
             canvasX = leftUsed;
 
         int availH = windowH - barH;
-        if (availH > canvasH)
-            canvasY = barH + (availH - canvasH) / 2;
+        if (availH > sh)
+            canvasY = barH + (availH - sh) / 2;
         else
             canvasY = barH;
+    }
+
+    void App::zoomAt(int screenPivotX, int screenPivotY, float newZoom)
+    {
+        newZoom = std::clamp(newZoom, MIN_ZOOM, MAX_ZOOM);
+        if (newZoom == zoom)
+            return;
+
+        // Keep the document point currently under (screenPivotX, screenPivotY)
+        // under that same screen point after the zoom changes.
+        float ratio = newZoom / zoom;
+        canvasX = (int)(screenPivotX - (screenPivotX - canvasX) * ratio + 0.5f);
+        canvasY = (int)(screenPivotY - (screenPivotY - canvasY) * ratio + 0.5f);
+        zoom = newZoom;
+    }
+
+    void App::zoomInAtCenter() { zoomAt(windowW / 2, windowH / 2, zoom * 1.25f); }
+    void App::zoomOutAtCenter() { zoomAt(windowW / 2, windowH / 2, zoom / 1.25f); }
+
+    void App::resetZoom()
+    {
+        zoom = 1.0f;
+        recenterCanvas();
     }
 
     void App::toggleFullscreen()
@@ -230,8 +271,9 @@ namespace Inkspire
 
     bool App::screenToCanvas(int sx, int sy, int &cx, int &cy) const
     {
-        cx = sx - canvasX;
-        cy = sy - canvasY;
+        // Screen → document: undo the pan offset, then undo the zoom scale.
+        cx = (int)((sx - canvasX) / zoom);
+        cy = (int)((sy - canvasY) / zoom);
         return cx >= 0 && cx < canvasW && cy >= 0 && cy < canvasH;
     }
 
@@ -278,6 +320,40 @@ namespace Inkspire
                 continue;
             }
 
+            // ---- View navigation: wheel zoom + space-drag pan ----
+            // These are handled ahead of the drawing logic so a pan gesture
+            // never leaks through as a stroke.
+            if (e.type == SDL_MOUSEWHEEL)
+            {
+                int mx, my;
+                SDL_GetMouseState(&mx, &my);
+                float step = (e.wheel.y > 0) ? 1.25f : (1.0f / 1.25f);
+                if (e.wheel.y != 0)
+                    zoomAt(mx, my, zoom * step); // zoom toward the cursor
+                continue;
+            }
+
+            if (spaceDown && e.type == SDL_MOUSEBUTTONDOWN && e.button.button == SDL_BUTTON_LEFT)
+            {
+                panning = true;
+                panLastX = e.button.x;
+                panLastY = e.button.y;
+                continue;
+            }
+            if (panning && e.type == SDL_MOUSEMOTION)
+            {
+                canvasX += e.motion.x - panLastX;
+                canvasY += e.motion.y - panLastY;
+                panLastX = e.motion.x;
+                panLastY = e.motion.y;
+                continue;
+            }
+            if (panning && e.type == SDL_MOUSEBUTTONUP && e.button.button == SDL_BUTTON_LEFT)
+            {
+                panning = false;
+                continue;
+            }
+
             if (e.type == SDL_KEYDOWN)
             {
                 SDL_Keycode k = e.key.keysym.sym;
@@ -289,6 +365,16 @@ namespace Inkspire
                     canvas->undo();
                 else if (ctrl && (k == SDLK_y || (k == SDLK_z && shift)))
                     canvas->redo();
+                // Ctrl+= / Ctrl+- zoom (center); Ctrl+0 resets to 100%.
+                // SDLK_EQUALS is the unshifted "=" key (the "+" key).
+                else if (ctrl && (k == SDLK_EQUALS || k == SDLK_PLUS || k == SDLK_KP_PLUS))
+                    zoomInAtCenter();
+                else if (ctrl && (k == SDLK_MINUS || k == SDLK_KP_MINUS))
+                    zoomOutAtCenter();
+                else if (ctrl && k == SDLK_0)
+                    resetZoom();
+                else if (k == SDLK_SPACE)
+                    spaceDown = true; // hold to pan-drag
                 else if (k == SDLK_b)
                     currentTool = Tool::Brush;
                 else if (k == SDLK_e)
@@ -308,6 +394,14 @@ namespace Inkspire
                 }
                 else if (k >= SDLK_1 && k <= SDLK_9)
                     canvas->setActiveLayer(k - SDLK_1);
+            }
+            else if (e.type == SDL_KEYUP)
+            {
+                if (e.key.keysym.sym == SDLK_SPACE)
+                {
+                    spaceDown = false;
+                    panning = false; // safety: releasing space ends any pan
+                }
             }
             else if (e.type == SDL_MOUSEBUTTONDOWN && e.button.button == SDL_BUTTON_LEFT)
             {
@@ -367,7 +461,7 @@ namespace Inkspire
 
         if (canvas)
         {
-            SDL_Rect paper = {canvasX, canvasY, canvasW, canvasH};
+            SDL_Rect paper = {canvasX, canvasY, scaledCanvasW(), scaledCanvasH()};
             canvas->renderCheckerboard(renderer, paper);
             canvas->render(renderer, paper, toolPanel.brushOpacity(), strokeActive);
         }
