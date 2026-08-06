@@ -1,7 +1,11 @@
 #pragma once
 #include "canvas.hpp"
 #include "menu.hpp"
-#include "toolpanel.hpp"
+#include "panel.hpp"
+#include "docklayout.hpp"
+#include "toolstate.hpp"
+#include "toolspanel.hpp"
+#include "tooloptionspanel.hpp"
 #include "colorpicker.hpp"
 #include "layerspanel.hpp"
 #include <SDL.h>
@@ -40,6 +44,31 @@ namespace Inkspire
         int scaledCanvasW() const; // canvasW * zoom, rounded
         int scaledCanvasH() const; // canvasH * zoom, rounded
 
+        // Panel layout: the dock tree owns all rectangles. relayout() recomputes
+        // it for the current window; panelById resolves a dock id to the live
+        // Panel object; panelRect looks up a panel's assigned rectangle.
+        void relayout();
+        Panel *panelById(const std::string &id);
+        SDL_Rect panelRect(const std::string &id) const;
+        PanelContext makeContext(const SDL_Rect &bounds);
+        void renderPanel(const PanelPlacement &pl); // header/rail chrome + content
+        void drawText(const std::string &s, int x, int y, SDL_Color c);
+
+        // Floating panels: torn off the dock, drawn on top, freely positioned.
+        // Not part of the dock tree. Re-dockable by dragging back. Defined here,
+        // before the methods and members that reference it.
+        struct FloatingPanel
+        {
+            std::string id;
+            SDL_Rect rect{0, 0, 0, 0}; // full frame (header + content) in window space
+        };
+
+        void renderFloats();
+        int floatHeaderAt(int x, int y) const;                      // index of float whose header holds (x,y), else -1
+        int floatContentPanelAt(int x, int y) const;                // index whose content holds (x,y), else -1
+        void tearOff(const std::string &panelId, int atX, int atY); // dock → float
+        SDL_Rect floatContentRect(const FloatingPanel &f) const;
+
         SDL_Window *window = nullptr;
         SDL_Renderer *renderer = nullptr;
 
@@ -47,7 +76,9 @@ namespace Inkspire
 
         TTF_Font *font = nullptr;
         MenuBar menuBar;
-        ToolPanel toolPanel;
+        ToolState toolState;
+        ToolsPanel toolsPanel;
+        ToolOptionsPanel toolOptionsPanel;
 
         Tool currentTool = Tool::Brush;
 
@@ -57,6 +88,31 @@ namespace Inkspire
         bool fullscreen = false;
 
         LayersPanel layersPanel;
+
+        DockLayout dock; // owns all panel rectangles + the canvas center rect
+
+        // Divider dragging (resize docks)
+        DockNode *dragDivider_ = nullptr; // non-null while dragging a divider
+        SDL_Cursor *curDefault_ = nullptr;
+        SDL_Cursor *curResizeH_ = nullptr; // horizontal resize (vertical divider)
+        SDL_Cursor *curResizeV_ = nullptr; // vertical resize (horizontal divider)
+
+        // Panel dragging (drag-to-redock). A header press arms a pending drag;
+        // moving past a threshold promotes it to an active drag.
+        DockNode *pendingDragLeaf_ = nullptr; // header pressed, not yet dragging
+        std::string dragPanelId_;             // id of the panel being dragged
+        std::string dragPanelTitle_;          // its title, for the ghost label
+        bool panelDragging_ = false;          // past the threshold
+        int dragStartX_ = 0, dragStartY_ = 0;
+        int dragCurX_ = 0, dragCurY_ = 0;
+        bool dragFromFloat_ = false; // true if the drag started on a float
+        int dragFloatIndex_ = -1;    // which float, when dragFromFloat_
+
+        // In-window floating panels (struct FloatingPanel defined above).
+        std::vector<FloatingPanel> floats_;
+        static constexpr int floatHeaderH_ = 22;
+        static constexpr int floatDefaultW_ = 200;
+        static constexpr int floatDefaultH_ = 260;
 
         ColorPicker bgPicker;
         bool bgPopupOpen = false;
