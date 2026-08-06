@@ -356,6 +356,135 @@ namespace Inkspire
         }
 
         beginStroke();
+        clearHistory(); // freshly opened document — discard prior history
+    }
+
+    // ---------------------------------------------------------------------
+    // Undo / redo
+    // ---------------------------------------------------------------------
+
+    Canvas::Snapshot Canvas::captureSnapshot()
+    {
+        Snapshot s;
+        s.activeLayer = activeLayer;
+        s.layers.reserve(layers.size());
+        for (int i = 0; i < (int)layers.size(); ++i)
+        {
+            const Layer &L = layers[i];
+            SnapLayer sl;
+            sl.kind = L.kind;
+            sl.name = L.name;
+            sl.visible = L.visible;
+            sl.bgColor = L.bgColor;
+            if (L.kind == Layer::Kind::Drawing && L.texture)
+                sl.pixels = readLayerPixels(i); // owned copy; nullptr on failure
+            s.layers.push_back(std::move(sl));
+        }
+        return s;
+    }
+
+    void Canvas::restoreSnapshot(const Snapshot &s)
+    {
+        // Tear down current live textures
+        for (auto &L : layers)
+            if (L.texture)
+            {
+                SDL_DestroyTexture(L.texture);
+                L.texture = nullptr;
+            }
+        layers.clear();
+
+        // Rebuild live layers from the snapshot
+        layers.reserve(s.layers.size());
+        for (const auto &sl : s.layers)
+        {
+            Layer L;
+            L.kind = sl.kind;
+            L.name = sl.name;
+            L.visible = sl.visible;
+            L.bgColor = sl.bgColor;
+            if (sl.kind == Layer::Kind::Drawing && sl.pixels)
+                L.texture = makeLayerTextureFromSurface(sl.pixels);
+            else if (sl.kind == Layer::Kind::Drawing)
+                createDrawingTexture(L.texture); // empty layer fallback
+            layers.push_back(std::move(L));
+        }
+
+        activeLayer = s.activeLayer;
+        if (activeLayer < 0 || activeLayer >= (int)layers.size() ||
+            layers[activeLayer].kind != Layer::Kind::Drawing)
+        {
+            for (int j = (int)layers.size() - 1; j >= 0; --j)
+                if (layers[j].kind == Layer::Kind::Drawing)
+                {
+                    activeLayer = j;
+                    break;
+                }
+        }
+
+        beginStroke(); // discard any in-progress scratch
+    }
+
+    void Canvas::freeSnapshot(Snapshot &s)
+    {
+        for (auto &sl : s.layers)
+            if (sl.pixels)
+            {
+                SDL_FreeSurface(sl.pixels);
+                sl.pixels = nullptr;
+            }
+        s.layers.clear();
+    }
+
+    void Canvas::pushUndo()
+    {
+        undoStack.push_back(captureSnapshot());
+
+        // Any new action invalidates the redo branch
+        for (auto &s : redoStack)
+            freeSnapshot(s);
+        redoStack.clear();
+
+        // Enforce the depth cap by dropping the oldest entry
+        if ((int)undoStack.size() > MAX_UNDO)
+        {
+            freeSnapshot(undoStack.front());
+            undoStack.erase(undoStack.begin());
+        }
+    }
+
+    bool Canvas::undo()
+    {
+        if (undoStack.empty())
+            return false;
+        redoStack.push_back(captureSnapshot()); // so redo can come back here
+        Snapshot s = std::move(undoStack.back());
+        undoStack.pop_back();
+        restoreSnapshot(s);
+        freeSnapshot(s);
+        return true;
+    }
+
+    bool Canvas::redo()
+    {
+        if (redoStack.empty())
+            return false;
+        undoStack.push_back(captureSnapshot());
+        Snapshot s = std::move(redoStack.back());
+        redoStack.pop_back();
+        restoreSnapshot(s);
+        freeSnapshot(s);
+        return true;
+    }
+
+    void Canvas::clearHistory()
+    {
+        for (auto &s : undoStack)
+            freeSnapshot(s);
+        for (auto &s : redoStack)
+            freeSnapshot(s);
+        undoStack.clear();
+        redoStack.clear();
     }
 
     void Canvas::reset()
@@ -383,7 +512,8 @@ namespace Inkspire
         layers.push_back(draw);
 
         activeLayer = 1;
-        beginStroke(); // clear any in-progress scratch
+        beginStroke();  // clear any in-progress scratch
+        clearHistory(); // new document — old undo states no longer apply
     }
 
     void Canvas::render(SDL_Renderer *renderer, const SDL_Rect &dst, float strokeOpacity, bool strokeActive)
@@ -414,6 +544,7 @@ namespace Inkspire
 
     void Canvas::shutdown()
     {
+        clearHistory(); // free all snapshot surfaces
         for (auto &L : layers)
             if (L.texture)
             {

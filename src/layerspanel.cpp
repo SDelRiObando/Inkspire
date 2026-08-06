@@ -38,11 +38,13 @@ namespace Inkspire
         // Add / delete buttons (in the header)
         if (inRect(mx, my, addRect))
         {
+            canvas.pushUndo();
             canvas.addLayer();
             return true;
         }
         if (inRect(mx, my, delRect))
         {
+            canvas.pushUndo();
             canvas.deleteLayer(canvas.getActiveLayer());
             return true;
         }
@@ -61,7 +63,10 @@ namespace Inkspire
                 // Left ~28px = eye toggle; rest = select
                 SDL_Rect eye = {panelX + 6, y + rowH / 2 - 8, 16, 16};
                 if (inRect(mx, my, eye))
+                {
+                    canvas.pushUndo();
                     canvas.toggleVisible(layerIndex);
+                }
                 else
                     canvas.setActiveLayer(layerIndex); // background rejected internally
                 return true;

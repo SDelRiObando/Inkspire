@@ -105,12 +105,13 @@ namespace Inkspire
                      { quit = true; });
 
         Menu &edit = menuBar.addMenu("Edit");
-        edit.addItem("Undo", []()
-                     { std::cout << "TODO: Undo\n"; });
-        edit.addItem("Redo", []()
-                     { std::cout << "TODO: Redo\n"; });
+        edit.addItem("Undo", [this]()
+                     { canvas->undo(); });
+        edit.addItem("Redo", [this]()
+                     { canvas->redo(); });
         edit.addItem("Clear", [this]()
-                     { canvas->clear(); });
+                     { canvas->pushUndo();
+                       canvas->clear(); });
 
         Menu &view = menuBar.addMenu("View");
         view.addItem("Toggle Fullscreen", [this]()
@@ -267,6 +268,11 @@ namespace Inkspire
 
             if (bgPopupOpen && e.type != SDL_KEYDOWN)
             {
+                // Snapshot once, on the mouse-down that starts the interaction,
+                // so a click-drag across the value slider is a single undo entry
+                // rather than one per motion event.
+                if (e.type == SDL_MOUSEBUTTONDOWN && e.button.button == SDL_BUTTON_LEFT)
+                    canvas->pushUndo();
                 bgPicker.handleEvent(e);
                 canvas->setBackgroundColor(bgPicker.color());
                 continue;
@@ -275,7 +281,15 @@ namespace Inkspire
             if (e.type == SDL_KEYDOWN)
             {
                 SDL_Keycode k = e.key.keysym.sym;
-                if (k == SDLK_b)
+                bool ctrl = (e.key.keysym.mod & KMOD_CTRL) != 0;
+                bool shift = (e.key.keysym.mod & KMOD_SHIFT) != 0;
+
+                // Ctrl+Z = undo, Ctrl+Y or Ctrl+Shift+Z = redo
+                if (ctrl && k == SDLK_z && !shift)
+                    canvas->undo();
+                else if (ctrl && (k == SDLK_y || (k == SDLK_z && shift)))
+                    canvas->redo();
+                else if (k == SDLK_b)
                     currentTool = Tool::Brush;
                 else if (k == SDLK_e)
                     currentTool = Tool::Eraser;
@@ -288,7 +302,10 @@ namespace Inkspire
                     bgPopupOpen = !bgPopupOpen;
                 }
                 else if (k == SDLK_h)
+                {
+                    canvas->pushUndo();
                     canvas->toggleVisible(canvas->getActiveLayer());
+                }
                 else if (k >= SDLK_1 && k <= SDLK_9)
                     canvas->setActiveLayer(k - SDLK_1);
             }
@@ -297,6 +314,12 @@ namespace Inkspire
                 int cx, cy;
                 if (screenToCanvas(e.button.x, e.button.y, cx, cy))
                 {
+                    // One undo entry per stroke: snapshot before the first pixel
+                    // changes. True for the brush (committed at mouse-up) and the
+                    // eraser (drawn continuously), so it must happen here, once.
+                    if (canvas->activeIsDrawable())
+                        canvas->pushUndo();
+
                     drawing = true;
                     lastX = cx;
                     lastY = cy;

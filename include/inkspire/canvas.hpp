@@ -66,11 +66,50 @@ namespace Inkspire
         void setBackgroundColor(SDL_Color c);
         bool activeIsDrawable() const;
 
+        // Undo / redo. Callers invoke pushUndo() immediately BEFORE a mutating
+        // action (one call per undoable unit of work). undo()/redo() restore
+        // whole-document state and return true if anything changed.
+        void pushUndo();
+        bool undo();
+        bool redo();
+        bool canUndo() const { return !undoStack.empty(); }
+        bool canRedo() const { return !redoStack.empty(); }
+        void clearHistory();
+
     private:
         bool createDrawingTexture(SDL_Texture *&tex);
         bool createStrokeTexture();
         void fillCircle(int cx, int cy, int radius);
         SDL_Texture *activeTexture(); // convenience
+
+        // ---- History ----
+        // A single undoable state: a full, inert copy of the document. Drawing
+        // layers keep their pixels as an SDL_Surface (owned) rather than a live
+        // texture, so a snapshot costs nothing to keep around besides memory.
+        struct SnapLayer
+        {
+            Layer::Kind kind = Layer::Kind::Drawing;
+            std::string name;
+            bool visible = true;
+            SDL_Color bgColor = {255, 255, 255, 255};
+            SDL_Surface *pixels = nullptr; // owned; only for drawing layers
+        };
+        struct Snapshot
+        {
+            int activeLayer = 1;
+            std::vector<SnapLayer> layers;
+        };
+
+        Snapshot captureSnapshot();              // deep-copy current document
+        void restoreSnapshot(const Snapshot &s); // rebuild live document from a snapshot
+        static void freeSnapshot(Snapshot &s);   // free owned surfaces
+
+        std::vector<Snapshot> undoStack;
+        std::vector<Snapshot> redoStack;
+
+        // Default cap on undo depth. More = more history but more memory/slower;
+        // fewer = leaner and faster. Exposed via settings later; a constant for now.
+        static constexpr int MAX_UNDO = 200;
 
         std::vector<Layer> layers;
         int activeLayer = 1; // index 0 is the background

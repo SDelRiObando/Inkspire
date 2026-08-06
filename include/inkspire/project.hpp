@@ -1,7 +1,8 @@
 #pragma once
 
 #include <string>
-#include "inkspire/canvas.hpp"
+#include "canvas.hpp"
+#include <vector>
 
 namespace Inkspire
 {
