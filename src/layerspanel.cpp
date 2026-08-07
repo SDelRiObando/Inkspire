@@ -24,29 +24,42 @@ namespace Inkspire
         SDL_FreeSurface(surf);
     }
 
-    bool LayersPanel::handleEvent(const SDL_Event &e, const PanelContext &ctx)
+    int LayersPanel::renderHeaderActions(SDL_Renderer *renderer, const SDL_Rect &h,
+                                         const PanelContext &ctx)
     {
+        (void)ctx;
+        // Add / delete buttons, right-aligned in the title header. Inset a little
+        // from the right edge so they clear the column collapse toggle.
+        int bw = 22, bh = 18;
+        int gap = 4;
+        int top = h.y + (h.h - bh) / 2;
+        int rightInset = 6;
+        delRect = {h.x + h.w - rightInset - bw, top, bw, bh};
+        addRect = {delRect.x - gap - bw, top, bw, bh};
+
+        SDL_SetRenderDrawColor(renderer, 60, 60, 65, 255);
+        SDL_RenderFillRect(renderer, &addRect);
+        SDL_RenderFillRect(renderer, &delRect);
+        SDL_SetRenderDrawColor(renderer, 210, 210, 210, 255);
+        // "+" on add
+        SDL_RenderDrawLine(renderer, addRect.x + 11, addRect.y + 4, addRect.x + 11, addRect.y + 14);
+        SDL_RenderDrawLine(renderer, addRect.x + 5, addRect.y + 9, addRect.x + 17, addRect.y + 9);
+        // "-" on delete
+        SDL_RenderDrawLine(renderer, delRect.x + 5, delRect.y + 9, delRect.x + 17, delRect.y + 9);
+
+        return addRect.x; // title text must stop before here
+    }
+
+    bool LayersPanel::handleHeaderEvent(const SDL_Event &e, const SDL_Rect &h,
+                                        const PanelContext &ctx)
+    {
+        (void)h;
         if (!ctx.canvas)
             return false;
-        Canvas &canvas = *ctx.canvas;
-        const SDL_Rect &b = bounds_; // set during render
-
-        // The scrollbar (wheel, thumb drag, track click) gets first crack. When
-        // it consumes an event, the rows must not also react. contentH mirrors
-        // the render computation: one row per layer.
-        SDL_Rect vp = rowViewport(b);
-        int contentH = (int)canvas.getLayers().size() * rowH;
-        if (scroll.handleEvent(e, vp, contentH))
-            return true;
-
         if (e.type != SDL_MOUSEBUTTONDOWN || e.button.button != SDL_BUTTON_LEFT)
             return false;
-
         int mx = e.button.x, my = e.button.y;
-        if (!inRect(mx, my, b))
-            return false; // click not in this panel
-
-        // Add / delete buttons (in the header — not scrolled)
+        Canvas &canvas = *ctx.canvas;
         if (inRect(mx, my, addRect))
         {
             canvas.pushUndo();
@@ -59,15 +72,36 @@ namespace Inkspire
             canvas.deleteLayer(canvas.getActiveLayer());
             return true;
         }
+        return false;
+    }
+
+    bool LayersPanel::handleEvent(const SDL_Event &e, const PanelContext &ctx)
+    {
+        if (!ctx.canvas)
+            return false;
+        Canvas &canvas = *ctx.canvas;
+        const SDL_Rect &b = bounds_; // content rect, set during render
+
+        // The scrollbar (wheel, thumb drag, track click) gets first crack. The
+        // whole content rect is the scroll viewport now that the header is drawn
+        // by the column chrome above this rect.
+        int contentH = (int)canvas.getLayers().size() * rowH;
+        if (scroll.handleEvent(e, b, contentH))
+            return true;
+
+        if (e.type != SDL_MOUSEBUTTONDOWN || e.button.button != SDL_BUTTON_LEFT)
+            return false;
+
+        int mx = e.button.x, my = e.button.y;
+        if (!inRect(mx, my, b))
+            return false; // click not in this panel
 
         // Layer rows — drawn top-to-bottom but layers are stored bottom-to-top,
         // so the topmost row is the LAST layer in the vector. Rows are shifted by
-        // the scroll offset, and clicks outside the row viewport are ignored.
-        if (!inRect(mx, my, vp))
-            return true; // inside panel but not a row (e.g. header gap) — consume
+        // the scroll offset.
         const auto &layers = canvas.getLayers();
         int n = (int)layers.size();
-        int y = vp.y - scroll.offset();
+        int y = b.y - scroll.offset();
         for (int row = 0; row < n; ++row)
         {
             int layerIndex = n - 1 - row; // top row = top layer = last in vector
@@ -96,7 +130,7 @@ namespace Inkspire
     {
         setBounds(ctx.bounds);
         SDL_Renderer *renderer = ctx.renderer;
-        const SDL_Rect &b = ctx.bounds;
+        const SDL_Rect &b = ctx.bounds; // content rect (below the column headers)
         if (!ctx.canvas)
             return;
         Canvas &canvas = *ctx.canvas;
@@ -106,40 +140,25 @@ namespace Inkspire
         SDL_RenderFillRect(renderer, &b);
 
         SDL_Color textColor = {230, 230, 230, 255};
-        renderText(renderer, "Layers", b.x + 10, b.y + 8, textColor);
 
-        // Add / delete buttons (anchored to the panel's right edge)
-        addRect = {b.x + b.w - 56, b.y + 6, 22, 20};
-        delRect = {b.x + b.w - 30, b.y + 6, 22, 20};
-        SDL_SetRenderDrawColor(renderer, 60, 60, 65, 255);
-        SDL_RenderFillRect(renderer, &addRect);
-        SDL_RenderFillRect(renderer, &delRect);
-        SDL_SetRenderDrawColor(renderer, 210, 210, 210, 255);
-        // "+" on add
-        SDL_RenderDrawLine(renderer, addRect.x + 11, addRect.y + 4, addRect.x + 11, addRect.y + 16);
-        SDL_RenderDrawLine(renderer, addRect.x + 5, addRect.y + 10, addRect.x + 17, addRect.y + 10);
-        // "-" on delete
-        SDL_RenderDrawLine(renderer, delRect.x + 5, delRect.y + 10, delRect.x + 17, delRect.y + 10);
-
-        // Layer rows, top layer first — scrolled and clipped to the viewport so
-        // rows past the bottom are reachable via the wheel rather than lost.
+        // Layer rows fill the whole content rect now — the "Layers" title and the
+        // add/delete buttons live on the column-provided header above this rect.
         const auto &layers = canvas.getLayers();
         int n = (int)layers.size();
         int active = canvas.getActiveLayer();
 
-        SDL_Rect vp = rowViewport(b);
         int contentH = n * rowH;
-        scroll.clamp(contentH, vp.h);
+        scroll.clamp(contentH, b.h);
 
-        SDL_RenderSetClipRect(renderer, &vp);
-        int y = vp.y - scroll.offset();
+        SDL_RenderSetClipRect(renderer, &b);
+        int y = b.y - scroll.offset();
         for (int row = 0; row < n; ++row)
         {
             int layerIndex = n - 1 - row;
             const Layer &L = layers[layerIndex];
 
             // Skip rows entirely outside the viewport (cheap cull).
-            if (y + rowH < vp.y || y > vp.y + vp.h)
+            if (y + rowH < b.y || y > b.y + b.h)
             {
                 y += rowH;
                 continue;
@@ -175,6 +194,6 @@ namespace Inkspire
         SDL_RenderSetClipRect(renderer, nullptr);
 
         // Thin position indicator on the right edge when the list overflows.
-        scroll.renderIndicator(renderer, vp, contentH);
+        scroll.renderIndicator(renderer, b, contentH);
     }
 }

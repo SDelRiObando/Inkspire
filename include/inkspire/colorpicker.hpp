@@ -14,6 +14,14 @@ namespace Inkspire
         // Lay out and draw within the given top-left area; returns the y below the picker
         int render(SDL_Renderer *renderer, int x, int y, int width, bool showSwatches = true, bool showPlus = true);
 
+        // Draw only the current-color preview, the add (+) button, and the swatch
+        // grid — no wheel or value slider. Used by the standalone palette panel
+        // so swatches can be docked separately from the wheel. Returns the y
+        // below the drawn content. Shares swatchRects/plusRect with the wheel
+        // panel, so whichever panel rendered most recently owns the live hit
+        // geometry; in practice only one palette surface is visible at a time.
+        int renderSwatches(SDL_Renderer *renderer, int x, int y, int width, bool showPlus = true);
+
         // Returns true if the event was consumed
         bool handleEvent(const SDL_Event &e);
 

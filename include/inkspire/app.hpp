@@ -5,7 +5,10 @@
 #include "docklayout.hpp"
 #include "toolstate.hpp"
 #include "toolspanel.hpp"
-#include "tooloptionspanel.hpp"
+#include "brushsizepanel.hpp"
+#include "brushsettingspanel.hpp"
+#include "brushcolorpanel.hpp"
+#include "colorpalettepanel.hpp"
 #include "colorpicker.hpp"
 #include "layerspanel.hpp"
 #include <SDL.h>
@@ -52,6 +55,11 @@ namespace Inkspire
         SDL_Rect panelRect(const std::string &id) const;
         PanelContext makeContext(const SDL_Rect &bounds);
         void renderPanel(const PanelPlacement &pl); // header/rail chrome + content
+        // The name shown on a column's header: the shared category of all its
+        // panels ("Tool Options"), or a combined name when it mixes categories
+        // ("Layers + Tool Options"). Order follows the column's panel order,
+        // each distinct category listed once.
+        std::string columnCategory(const PanelPlacement &pl) const;
         void drawText(const std::string &s, int x, int y, SDL_Color c);
 
         // Floating panels: torn off the dock, drawn on top, freely positioned.
@@ -78,7 +86,10 @@ namespace Inkspire
         MenuBar menuBar;
         ToolState toolState;
         ToolsPanel toolsPanel;
-        ToolOptionsPanel toolOptionsPanel;
+        BrushSizePanel brushSizePanel;
+        BrushSettingsPanel brushSettingsPanel;
+        BrushColorPanel brushColorPanel;
+        ColorPalettePanel colorPalettePanel;
 
         Tool currentTool = Tool::Brush;
 

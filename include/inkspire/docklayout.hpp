@@ -44,14 +44,21 @@ namespace Inkspire
         std::vector<std::string> panelIds; // panels stacked as tabs (one for now)
         bool isCanvasCenter = false;       // true = the drawing area, not a panel
 
-        // Minimum primary-axis size (px) this node may be shrunk to by a divider
-        // drag. Content panels (tool options, layers) want ~120; the tools strip
-        // is happy much thinner. Applied to whichever side owns it.
-        int minPixels = 40;
+        // Minimum size (px) this leaf's content needs before assets start to
+        // clip or spill. Enforced on divider drags and on the initial layout.
+        // Width and height are tracked separately because a panel can need a
+        // wide wheel but only a short strip, or vice-versa. For a split node
+        // these are ignored; the effective minimum of a subtree is derived from
+        // its leaves (see minWidthOf / minHeightOf), summing along the split
+        // axis and taking the max across the other.
+        int minWidth = 120;
+        int minHeight = 60;
 
-        // Collapsed columns render as a thin rail (name sideways + >>). When
-        // collapsed, the layout gives this leaf a fixed thin width regardless of
-        // its normal size, and the freed space flows to the canvas.
+        // Column collapse. This flag lives on a column's ROOT node (the top of a
+        // vertical strip — either a lone panel leaf, or the horizontal-split
+        // subtree that stacks several panels). When set, the whole column renders
+        // as one thin rail and the freed width flows to the canvas. Individual
+        // stacked leaves never carry this; only their shared column root does.
         bool collapsed = false;
 
         // When a leaf holds multiple panels (tabs), which one is shown.
@@ -95,25 +102,42 @@ namespace Inkspire
     };
 
     // Result of a layout pass: where each panel goes, and where the canvas goes.
-    // Where a panel column has been placed and how to draw it. A column is a
-    // leaf that may hold one or more panels; for now one panel per leaf.
+    // A "column" is a vertical strip that may stack several panels (each its own
+    // leaf, joined by horizontal splits). Each panel gets its own header showing
+    // its own title; the column as a whole gets one category header bar with a
+    // single collapse toggle, and collapses/expands as a unit.
     struct PanelPlacement
     {
         std::string id;
-        DockNode *leaf = nullptr; // the column this panel lives in (for toggling)
+        DockNode *leaf = nullptr; // the leaf this panel lives in (for tab/drag)
 
-        SDL_Rect fullRect;    // the whole leaf rectangle (header + content)
-        SDL_Rect headerRect;  // the title/collapse bar along the top
-        SDL_Rect toggleRect;  // the << / >> collapse button (top-right of header)
-        SDL_Rect contentRect; // where the panel body draws (below the header)
+        // The root node of the column this panel belongs to. Collapse state and
+        // the single collapse toggle live here, shared by every panel in the
+        // column. For a lone panel, columnRoot == leaf.
+        DockNode *columnRoot = nullptr;
 
-        bool collapsed = false; // when true, render as a thin rail instead
+        SDL_Rect fullRect;    // the whole leaf rectangle (panel header + content)
+        SDL_Rect headerRect;  // this panel's own title bar along its top
+        SDL_Rect contentRect; // where the panel body draws (below its header)
 
-        // Tabs: all panel ids in this column and which is active. When there's
+        // The column-level chrome. Only the top panel of a column carries these:
+        // a category bar spanning the column's width with the single collapse
+        // toggle. Non-top panels leave these zeroed.
+        bool isColumnTop = false;
+        SDL_Rect columnHeaderRect{0, 0, 0, 0}; // category bar (top panel only)
+        SDL_Rect toggleRect{0, 0, 0, 0};       // the single collapse button
+
+        bool collapsed = false; // when true, this placement is the column's rail
+
+        // Tabs: all panel ids in this leaf and which is active. When there's
         // more than one, App draws a tab strip and `id` is the active tab.
         std::vector<std::string> tabIds;
         int activeTab = 0;
         SDL_Rect tabStripRect{0, 0, 0, 0}; // where the tab buttons sit
+
+        // For a collapsed column's rail: the ids of every panel in the column,
+        // so App can label the rail with the shared category. Empty otherwise.
+        std::vector<std::string> columnPanelIds;
     };
 
     // Where a dragged panel would land when dropped over a target leaf.
@@ -196,11 +220,38 @@ namespace Inkspire
         // Resize the split `node` so its divider tracks the mouse coordinate
         // (mx for a vertical divider, my for a horizontal one). Updates the
         // node's fixed-pixel size if it uses one, otherwise its ratio. Clamps so
-        // neither child shrinks below its minPixels. Caller recomputes after.
+        // neither child shrinks below its subtree minimum. Caller recomputes after.
         void dragDivider(DockNode *node, int mx, int my);
 
     private:
         void computeNode(DockNode *node, const SDL_Rect &rect);
+
+        // A "column" is a vertical strip of stacked panels: either a lone panel
+        // leaf or a subtree of only horizontal splits whose leaves are all
+        // panels (no canvas, no vertical splits). Its root carries the collapse
+        // flag and the single category header. These helpers identify columns.
+        //
+        // True if `node` is the root of such a column: it's a panel leaf or a
+        // horizontal-split-only subtree of panel leaves, AND its parent (if any)
+        // is not itself part of the same column (i.e. parent is a vertical split,
+        // or node is the root). Used to place the category header + toggle once.
+        bool isColumnRoot(DockNode *node) const;
+        // Minimum width/height a subtree needs, honoring split direction: a
+        // vertical split sums child widths (+divider) and maxes heights; a
+        // horizontal split sums heights and maxes widths; a leaf returns its own
+        // minWidth/minHeight (0 when collapsed / canvas, which impose no floor).
+        int minWidthOf(DockNode *node) const;
+        int minHeightOf(DockNode *node) const;
+        // True if the subtree rooted at `node` is a stack of panel leaves joined
+        // only by horizontal splits (or is a single panel leaf).
+        static bool isPanelStack(DockNode *node);
+        // Collect, in top-to-bottom order, every panel leaf in a column subtree.
+        static void collectColumnLeaves(DockNode *node, std::vector<DockNode *> &out);
+        // Lay out an expanded column: a category header across the top, then the
+        // stacked panels below it (each with its own title header).
+        void computeColumn(DockNode *columnRoot, const SDL_Rect &rect);
+        // Lay out a collapsed column: one rail for the whole strip.
+        void computeCollapsedColumn(DockNode *columnRoot, const SDL_Rect &rect);
 
         // Tree-surgery helpers for applyDrop.
         // Find the split node whose child (a or b) is `child`; nullptr if `child`
@@ -220,8 +271,9 @@ namespace Inkspire
         SDL_Rect canvasRect_{0, 0, 0, 0};
         DockNode *canvasLeaf_ = nullptr; // the canvas-center leaf, for edge drops
         int dividerThickness_ = 4;
-        int railWidth_ = 26; // width of a collapsed column's rail
-        int headerH_ = 22;   // panel header bar height
-        int tabH_ = 20;      // tab strip height for multi-panel leaves
+        int railWidth_ = 26;     // width of a collapsed column's rail
+        int headerH_ = 22;       // per-panel title bar height
+        int columnHeaderH_ = 22; // column category bar height (holds the toggle)
+        int tabH_ = 20;          // tab strip height for multi-panel leaves
     };
 }

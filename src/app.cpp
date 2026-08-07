@@ -136,7 +136,10 @@ namespace Inkspire
 
         toolState.init(font);
         toolsPanel.init(font, &toolState);
-        toolOptionsPanel.init(font, &toolState);
+        brushSizePanel.init(font, &toolState);
+        brushSettingsPanel.init(font, &toolState);
+        brushColorPanel.init(font, &toolState);
+        colorPalettePanel.init(font, &toolState);
         layersPanel.init(font);
 
         dock.buildDefault(); // tools left, layers right, canvas center
@@ -262,8 +265,14 @@ namespace Inkspire
         // panels; two panels don't warrant it yet.)
         if (id == "tools")
             return &toolsPanel;
-        if (id == "tooloptions")
-            return &toolOptionsPanel;
+        if (id == "brushsize")
+            return &brushSizePanel;
+        if (id == "brushsettings")
+            return &brushSettingsPanel;
+        if (id == "brushcolor")
+            return &brushColorPanel;
+        if (id == "colorpalette")
+            return &colorPalettePanel;
         if (id == "layers")
             return &layersPanel;
         return nullptr;
@@ -348,11 +357,23 @@ namespace Inkspire
             SDL_Rect header = {f.rect.x, f.rect.y, f.rect.w, floatHeaderH_};
             SDL_SetRenderDrawColor(renderer, 30, 30, 34, 255);
             SDL_RenderFillRect(renderer, &header);
+
+            // Panel-supplied action buttons (e.g. Layers' +/−), right-aligned,
+            // same as the docked title header. The returned x is where the
+            // buttons begin, so the title is clipped to stop short of them.
+            SDL_Rect content = floatContentRect(f);
+            int actionsLeft = header.x + header.w;
+            if (p)
+                actionsLeft = p->renderHeaderActions(renderer, header, makeContext(content));
+
+            SDL_Rect titleClip = {header.x, header.y,
+                                  std::max(0, actionsLeft - header.x - 4), header.h};
+            SDL_RenderSetClipRect(renderer, &titleClip);
             drawText(p ? p->title() : f.id, header.x + 8,
                      header.y + (floatHeaderH_ - TTF_FontHeight(font)) / 2, text);
+            SDL_RenderSetClipRect(renderer, nullptr);
 
             // Content, clipped
-            SDL_Rect content = floatContentRect(f);
             if (p)
             {
                 SDL_RenderSetClipRect(renderer, &content);
@@ -366,24 +387,64 @@ namespace Inkspire
         }
     }
 
+    std::string App::columnCategory(const PanelPlacement &pl) const
+    {
+        // Collect the distinct categories of every panel in this column, in the
+        // column's own order, and join them with " + ". A pure Tool Options
+        // column reads "Tool Options"; a column that also holds Layers reads
+        // "Layers + Tool Options" (or the reverse, depending on order).
+        //
+        // Prefer columnPanelIds (every panel stacked in the column), then the
+        // leaf's tab ids, then the lone panel id — so the category reflects the
+        // whole column whether it's collapsed, tabbed, or a single panel.
+        std::vector<std::string> ids;
+        if (!pl.columnPanelIds.empty())
+            ids = pl.columnPanelIds;
+        else if (!pl.tabIds.empty())
+            ids = pl.tabIds;
+        else
+            ids = {pl.id};
+
+        std::string out;
+        std::vector<std::string> seen;
+        for (const auto &pid : ids)
+        {
+            Panel *p = const_cast<App *>(this)->panelById(pid);
+            std::string cat = p ? p->category() : pid;
+            bool dup = false;
+            for (const auto &s : seen)
+                if (s == cat)
+                {
+                    dup = true;
+                    break;
+                }
+            if (dup)
+                continue;
+            seen.push_back(cat);
+            if (!out.empty())
+                out += " + ";
+            out += cat;
+        }
+        return out;
+    }
+
     void App::renderPanel(const PanelPlacement &pl)
     {
         Panel *p = panelById(pl.id);
         SDL_Color text = {220, 220, 225, 255};
+        SDL_Color subtext = {170, 170, 178, 255};
 
         // Which side of the window is this dock on? The collapse arrow points
-        // toward the nearest edge (the way the panel tucks away); the expand
+        // toward the nearest edge (the way the column tucks away); the expand
         // arrow points back inward. Left dock: collapse "<<", expand ">>".
-        // Right dock: collapse ">>", expand "<<". (Inferred from position for
-        // now; becomes an explicit dock side once panels can be dragged.)
         bool rightSide = (pl.fullRect.x + pl.fullRect.w / 2) > (windowW / 2);
         const char *collapseArrow = rightSide ? ">>" : "<<";
         const char *expandArrow = rightSide ? "<<" : ">>";
 
         if (pl.collapsed)
         {
-            // Thin rail: fill, the expand glyph near the top, panel title drawn
-            // vertically (one character per line) below it.
+            // The whole column is one thin rail: fill, the expand glyph near the
+            // top, the column category drawn vertically (one char per row) below.
             SDL_SetRenderDrawColor(renderer, 44, 44, 48, 255);
             SDL_RenderFillRect(renderer, &pl.fullRect);
             SDL_SetRenderDrawColor(renderer, 70, 70, 76, 255);
@@ -392,10 +453,9 @@ namespace Inkspire
             int cx = pl.fullRect.x + pl.fullRect.w / 2;
             drawText(expandArrow, cx - 8, pl.fullRect.y + 5, text);
 
-            // Title, one letter per row, going down.
-            const char *title = p ? p->title() : "";
+            std::string cat = columnCategory(pl);
             int ty = pl.fullRect.y + pl.fullRect.w + 6;
-            for (const char *c = title; *c; ++c)
+            for (const char *c = cat.c_str(); *c; ++c)
             {
                 if (*c == ' ')
                 {
@@ -409,24 +469,48 @@ namespace Inkspire
             return;
         }
 
-        // Header bar
-        SDL_SetRenderDrawColor(renderer, 34, 34, 38, 255);
+        // --- Column category header + single collapse toggle (top panel only) ---
+        if (pl.isColumnTop && pl.columnHeaderRect.h > 0)
+        {
+            SDL_SetRenderDrawColor(renderer, 30, 30, 34, 255);
+            SDL_RenderFillRect(renderer, &pl.columnHeaderRect);
+            drawText(columnCategory(pl), pl.columnHeaderRect.x + 8,
+                     pl.columnHeaderRect.y + (pl.columnHeaderRect.h - TTF_FontHeight(font)) / 2,
+                     text);
+
+            SDL_Rect tog = pl.toggleRect;
+            tog.x -= 3; // pull left, off the right border
+            tog.y += 2;
+            tog.h -= 4;
+            SDL_SetRenderDrawColor(renderer, 54, 54, 60, 255);
+            SDL_RenderFillRect(renderer, &tog);
+            drawText(collapseArrow, tog.x + 3,
+                     tog.y + (tog.h - TTF_FontHeight(font)) / 2, text);
+        }
+
+        // --- This panel's own title header (shows the panel name) ---
+        SDL_SetRenderDrawColor(renderer, 40, 40, 45, 255);
         SDL_RenderFillRect(renderer, &pl.headerRect);
-        drawText(p ? p->title() : "", pl.headerRect.x + 8,
-                 pl.headerRect.y + (pl.headerRect.h - TTF_FontHeight(font)) / 2, text);
+        // A thin separator line along the header's top edge for visual grouping.
+        SDL_SetRenderDrawColor(renderer, 24, 24, 27, 255);
+        SDL_RenderDrawLine(renderer, pl.headerRect.x, pl.headerRect.y,
+                           pl.headerRect.x + pl.headerRect.w, pl.headerRect.y);
 
-        // Collapse toggle, inset from the panel's border so it isn't clipped by
-        // the divider/edge.
-        SDL_Rect tog = pl.toggleRect;
-        tog.x -= 3; // pull left, off the right border
-        tog.y += 2; // small top inset
-        tog.h -= 4;
-        SDL_SetRenderDrawColor(renderer, 54, 54, 60, 255);
-        SDL_RenderFillRect(renderer, &tog);
-        drawText(collapseArrow, tog.x + 3,
-                 tog.y + (tog.h - TTF_FontHeight(font)) / 2, text);
+        // Panel-supplied action buttons (right-aligned), e.g. Layers' +/−. The
+        // returned x is where the buttons begin, so the title text is clipped to
+        // stop short of them rather than overlapping.
+        int actionsLeft = pl.headerRect.x + pl.headerRect.w;
+        if (p)
+            actionsLeft = p->renderHeaderActions(renderer, pl.headerRect, makeContext(pl.contentRect));
 
-        // Tab strip, when this column holds multiple panels.
+        SDL_Rect titleClip = {pl.headerRect.x, pl.headerRect.y,
+                              std::max(0, actionsLeft - pl.headerRect.x - 4), pl.headerRect.h};
+        SDL_RenderSetClipRect(renderer, &titleClip);
+        drawText(p ? p->title() : pl.id, pl.headerRect.x + 8,
+                 pl.headerRect.y + (pl.headerRect.h - TTF_FontHeight(font)) / 2, subtext);
+        SDL_RenderSetClipRect(renderer, nullptr);
+
+        // Tab strip, when this leaf holds multiple tabbed panels.
         if (pl.tabIds.size() > 1)
         {
             int n = (int)pl.tabIds.size();
@@ -444,7 +528,6 @@ namespace Inkspire
 
                 Panel *tp = panelById(pl.tabIds[i]);
                 const char *tt = tp ? tp->title() : pl.tabIds[i].c_str();
-                // Clip the label to its tab so long titles don't overrun.
                 SDL_RenderSetClipRect(renderer, &tabRect);
                 drawText(tt, tabRect.x + 5,
                          tabRect.y + (tabRect.h - TTF_FontHeight(font)) / 2, text);
@@ -667,14 +750,25 @@ namespace Inkspire
                 int fh = floatHeaderAt(e.button.x, e.button.y);
                 if (fh >= 0)
                 {
-                    // Bring to front (draw last) and arm a drag from this float.
+                    // Bring to front (draw last) first, so the panel and any drag
+                    // operate on the topmost copy.
                     FloatingPanel f = floats_[fh];
                     floats_.erase(floats_.begin() + fh);
                     floats_.push_back(f);
+                    Panel *p = panelById(f.id);
+
+                    // Offer the header click to the panel's own actions (e.g.
+                    // Layers' +/−) before arming a drag — same as docked panels,
+                    // so those buttons work while floating too.
+                    SDL_Rect fHeader = {floats_.back().rect.x, floats_.back().rect.y,
+                                        floats_.back().rect.w, floatHeaderH_};
+                    if (p && p->handleHeaderEvent(e, fHeader, makeContext(floatContentRect(floats_.back()))))
+                        continue; // button handled it; don't drag the float
+
+                    // Otherwise arm a drag from this float.
                     dragFloatIndex_ = (int)floats_.size() - 1;
                     dragFromFloat_ = true;
                     dragPanelId_ = f.id;
-                    Panel *p = panelById(f.id);
                     dragPanelTitle_ = p ? p->title() : f.id;
                     dragStartX_ = dragCurX_ = e.button.x;
                     dragStartY_ = dragCurY_ = e.button.y;
@@ -699,10 +793,12 @@ namespace Inkspire
                     dragDivider_ = d;
                     continue; // start dragging; don't let panels see this click
                 }
-                // Collapse / expand a column via its header toggle.
-                if (DockNode *leaf = dock.hitTestCollapseToggle(e.button.x, e.button.y))
+                // Collapse / expand the WHOLE column via its single toggle. The
+                // hit-test returns the column root; flipping its flag collapses
+                // or expands every panel stacked in that column at once.
+                if (DockNode *columnRoot = dock.hitTestCollapseToggle(e.button.x, e.button.y))
                 {
-                    leaf->collapsed = !leaf->collapsed;
+                    columnRoot->collapsed = !columnRoot->collapsed;
                     recenterCanvas(); // reflow around the new rail width
                     continue;
                 }
@@ -713,24 +809,32 @@ namespace Inkspire
                     leaf->activeTab = tabIdx;
                     continue;
                 }
-                // Header press (not on the toggle) arms a potential redock drag.
+                // Header press: first offer it to the panel's own header actions
+                // (e.g. Layers' +/− buttons). Only if the panel doesn't consume
+                // it does the press arm a potential redock drag — so clicking a
+                // header button never starts dragging the panel.
+                bool headerConsumed = false;
                 for (const auto &pl : dock.placements())
                 {
                     if (pl.collapsed)
                         continue;
-                    if (rectContains(pl.headerRect, e.button.x, e.button.y))
+                    if (!rectContains(pl.headerRect, e.button.x, e.button.y))
+                        continue;
+                    Panel *p = panelById(pl.id);
+                    if (p && p->handleHeaderEvent(e, pl.headerRect, makeContext(pl.contentRect)))
                     {
-                        pendingDragLeaf_ = pl.leaf;
-                        dragPanelId_ = pl.id;
-                        Panel *p = panelById(pl.id);
-                        dragPanelTitle_ = p ? p->title() : pl.id;
-                        dragStartX_ = dragCurX_ = e.button.x;
-                        dragStartY_ = dragCurY_ = e.button.y;
+                        headerConsumed = true; // a button handled it; no drag
                         break;
                     }
+                    pendingDragLeaf_ = pl.leaf;
+                    dragPanelId_ = pl.id;
+                    dragPanelTitle_ = p ? p->title() : pl.id;
+                    dragStartX_ = dragCurX_ = e.button.x;
+                    dragStartY_ = dragCurY_ = e.button.y;
+                    break;
                 }
-                if (pendingDragLeaf_)
-                    continue; // header press consumed; wait for motion or release
+                if (headerConsumed || pendingDragLeaf_)
+                    continue; // header handled the press (button or armed drag)
             }
 
             // Floating panel content gets events before docked panels (floats

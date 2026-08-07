@@ -253,6 +253,32 @@ namespace Inkspire
 
         int cursorY = y + wheelSize + 12;
 
+        if (showSwatches)
+        {
+            cursorY = renderSwatches(renderer, x, cursorY, width, showPlus);
+        }
+        else
+        {
+            // Just the current-color preview, no swatch grid.
+            SDL_Rect preview = {x, cursorY, 40, 24};
+            SDL_SetRenderDrawColor(renderer, current.r, current.g, current.b, 255);
+            SDL_RenderFillRect(renderer, &preview);
+            SDL_SetRenderDrawColor(renderer, 90, 90, 95, 255);
+            SDL_RenderDrawRect(renderer, &preview);
+            // Note: we deliberately don't touch plusRect/swatchRects here. When
+            // the wheel and palette are docked as separate panels, the palette
+            // owns that hit geometry; zeroing it here would break the + button
+            // depending on panel render order within a frame.
+            cursorY += 34;
+        }
+
+        return cursorY;
+    }
+
+    int ColorPicker::renderSwatches(SDL_Renderer *renderer, int x, int y, int width, bool showPlus)
+    {
+        int cursorY = y;
+
         // Current color preview
         SDL_Rect preview = {x, cursorY, 40, 24};
         SDL_SetRenderDrawColor(renderer, current.r, current.g, current.b, 255);
@@ -260,48 +286,41 @@ namespace Inkspire
         SDL_SetRenderDrawColor(renderer, 90, 90, 95, 255);
         SDL_RenderDrawRect(renderer, &preview);
 
-        if (showSwatches)
+        // add button
+        if (showPlus)
         {
-            // add button
-            if (showPlus)
-            {
-                plusRect = {x + 48, cursorY, 24, 24};
-                SDL_SetRenderDrawColor(renderer, 60, 60, 65, 255);
-                SDL_RenderFillRect(renderer, &plusRect);
-                SDL_SetRenderDrawColor(renderer, 200, 200, 200, 255);
-                SDL_RenderDrawLine(renderer, plusRect.x + 12, plusRect.y + 5, plusRect.x + 12, plusRect.y + 19);
-                SDL_RenderDrawLine(renderer, plusRect.x + 5, plusRect.y + 12, plusRect.x + 19, plusRect.y + 12);
-            }
-            else
-            {
-                plusRect = {0, 0, 0, 0}; // no clickable plus
-            }
-
-            cursorY += 34;
-
-            // Swatches grid
-            int sw = 22, sh = 22, sgap = 6, perRow = width / (sw + sgap);
-            if (perRow < 1)
-                perRow = 1;
-            swatchRects.clear();
-            for (size_t i = 0; i < swatches.size(); ++i)
-            {
-                int col = (int)i % perRow;
-                int row = (int)i / perRow;
-                SDL_Rect r = {x + col * (sw + sgap), cursorY + row * (sh + sgap), sw, sh};
-                swatchRects.push_back(r);
-                SDL_SetRenderDrawColor(renderer, swatches[i].r, swatches[i].g, swatches[i].b, 255);
-                SDL_RenderFillRect(renderer, &r);
-                SDL_SetRenderDrawColor(renderer, 90, 90, 95, 255);
-                SDL_RenderDrawRect(renderer, &r);
-            }
-            int rows = swatches.empty() ? 0 : ((int)swatches.size() - 1) / perRow + 1;
-            cursorY += rows * (sh + sgap) + 8;
+            plusRect = {x + 48, cursorY, 24, 24};
+            SDL_SetRenderDrawColor(renderer, 60, 60, 65, 255);
+            SDL_RenderFillRect(renderer, &plusRect);
+            SDL_SetRenderDrawColor(renderer, 200, 200, 200, 255);
+            SDL_RenderDrawLine(renderer, plusRect.x + 12, plusRect.y + 5, plusRect.x + 12, plusRect.y + 19);
+            SDL_RenderDrawLine(renderer, plusRect.x + 5, plusRect.y + 12, plusRect.x + 19, plusRect.y + 12);
         }
         else
         {
-            cursorY += 34;
+            plusRect = {0, 0, 0, 0}; // no clickable plus
         }
+
+        cursorY += 34;
+
+        // Swatches grid
+        int sw = 22, sh = 22, sgap = 6, perRow = width / (sw + sgap);
+        if (perRow < 1)
+            perRow = 1;
+        swatchRects.clear();
+        for (size_t i = 0; i < swatches.size(); ++i)
+        {
+            int col = (int)i % perRow;
+            int row = (int)i / perRow;
+            SDL_Rect r = {x + col * (sw + sgap), cursorY + row * (sh + sgap), sw, sh};
+            swatchRects.push_back(r);
+            SDL_SetRenderDrawColor(renderer, swatches[i].r, swatches[i].g, swatches[i].b, 255);
+            SDL_RenderFillRect(renderer, &r);
+            SDL_SetRenderDrawColor(renderer, 90, 90, 95, 255);
+            SDL_RenderDrawRect(renderer, &r);
+        }
+        int rows = swatches.empty() ? 0 : ((int)swatches.size() - 1) / perRow + 1;
+        cursorY += rows * (sh + sgap) + 8;
 
         return cursorY;
     }

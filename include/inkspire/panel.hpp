@@ -31,8 +31,16 @@ namespace Inkspire
         // "tools", "navigator"). Must not change across runs.
         virtual const char *id() const = 0;
 
-        // Human-readable label shown in the panel header once docking exists.
+        // Human-readable label shown on this panel's tab.
         virtual const char *title() const = 0;
+
+        // The category this panel belongs to. A dock column's header shows the
+        // category name(s) of the panels it holds — a single category ("Tool
+        // Options") when they all agree, or a combined name ("Layers + Tool
+        // Options") when a column mixes categories. Panels that are their own
+        // category (Layers, Tools) just return their title; the tool-option
+        // panels (size, settings, color, palette) all return "Tool Options".
+        virtual const char *category() const { return title(); }
 
         // Draw into ctx.bounds. Implementations should also cache the bounds
         // (via setBounds) so handleEvent can hit-test against the same rect.
@@ -41,6 +49,32 @@ namespace Inkspire
         // Handle an event. Return true if it was consumed (so nothing else
         // downstream reacts to it). Hit-testing should use the cached bounds.
         virtual bool handleEvent(const SDL_Event &e, const PanelContext &ctx) = 0;
+
+        // Optional per-panel action buttons drawn into this panel's title header
+        // (right-aligned), e.g. Layers' add/delete. App draws the header chrome
+        // and the title, then calls this with `headerRect` so the panel can add
+        // its own controls. Return the left x of the drawn buttons so App can
+        // keep the title text from overlapping them (return headerRect right
+        // edge when nothing is drawn — the default). Cache rects for hit-testing.
+        virtual int renderHeaderActions(SDL_Renderer *renderer, const SDL_Rect &headerRect,
+                                        const PanelContext &ctx)
+        {
+            (void)renderer;
+            (void)ctx;
+            return headerRect.x + headerRect.w;
+        }
+
+        // Handle an event over this panel's title header (the action buttons).
+        // Called before the header press arms a redock drag, so a button click
+        // isn't swallowed by dragging. Return true if consumed. Default: ignore.
+        virtual bool handleHeaderEvent(const SDL_Event &e, const SDL_Rect &headerRect,
+                                       const PanelContext &ctx)
+        {
+            (void)e;
+            (void)headerRect;
+            (void)ctx;
+            return false;
+        }
 
         // Size hints the layout may honor or override. Width for side docks,
         // height for stacked docks. 0 means "no preference / fill available".

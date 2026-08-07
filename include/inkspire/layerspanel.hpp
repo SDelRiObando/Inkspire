@@ -21,27 +21,26 @@ namespace Inkspire
         bool handleEvent(const SDL_Event &e, const PanelContext &ctx) override;
         int preferredWidth() const override { return panelW; }
 
+        // The add/delete buttons live on the column-provided title header now,
+        // not inside the panel body. App draws the header + "Layers" title; these
+        // hooks add the +/− buttons at the right and handle their clicks.
+        int renderHeaderActions(SDL_Renderer *renderer, const SDL_Rect &headerRect,
+                                const PanelContext &ctx) override;
+        bool handleHeaderEvent(const SDL_Event &e, const SDL_Rect &headerRect,
+                               const PanelContext &ctx) override;
+
     private:
         void renderText(SDL_Renderer *renderer, const std::string &text, int x, int y, SDL_Color color);
-        // The scrollable region for the layer rows (panel minus the header).
-        SDL_Rect rowViewport(const SDL_Rect &b) const
-        {
-            SDL_Rect v = {b.x, b.y + headerH, b.w, b.h - headerH};
-            if (v.h < 0)
-                v.h = 0;
-            return v;
-        }
 
         TTF_Font *font = nullptr;
         int panelW = 200;
         int rowH = 40;
-        int headerH = 32; // "Layers" title + add/delete buttons
 
         ScrollState scroll; // vertical scrolling of the layer rows
 
-        // Geometry captured during render for hit-testing
+        // Geometry captured during render/renderHeaderActions for hit-testing.
         SDL_Rect addRect{0, 0, 0, 0};
         SDL_Rect delRect{0, 0, 0, 0};
-        // Per-row rects are recomputed each event from the same layout
+        // Per-row rects are recomputed each event from the same layout.
     };
 }
