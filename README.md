@@ -65,6 +65,9 @@ The default panels are **Tools** (tool selection), **Tool Options** (size, opaci
 | Select a tool                   | Click a button in the **Tools** panel |
 | Draw                            | Left-click and drag on the canvas    |
 | Brush / Eraser                  | **B** / **E**                        |
+| Save                            | **Ctrl + S** or **File → Save**      |
+| Copy active layer               | **Ctrl + C**                         |
+| Paste as new layer              | **Ctrl + V**                         |
 | Pan canvas                      | Hold **Space** and drag              |
 | Zoom                            | Mouse scroll wheel                   |
 | Zoom in / out                   | **Ctrl + =** / **Ctrl + -**          |
