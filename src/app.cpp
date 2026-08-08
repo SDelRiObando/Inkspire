@@ -932,6 +932,25 @@ namespace Inkspire
                     canvas->undo();
                 else if (ctrl && (k == SDLK_y || (k == SDLK_z && shift)))
                     canvas->redo();
+                // Ctrl+S = save. Reuses the menu's Save path exactly: quick-saves
+                // to the known file, or falls back to Save As when there's none.
+                else if (ctrl && k == SDLK_s)
+                    saveCurrent();
+                // Ctrl+C = copy, Ctrl+V = paste. With no selection tool yet, copy
+                // grabs the whole active layer; paste drops it onto a new layer
+                // above (in place). Once selections exist, copy will grab the
+                // selection instead and paste stays identical. Copy doesn't
+                // mutate the document, so no undo; paste does, so push first.
+                else if (ctrl && k == SDLK_c)
+                    canvas->copyActiveLayer();
+                else if (ctrl && k == SDLK_v)
+                {
+                    if (canvas->hasClipboard())
+                    {
+                        canvas->pushUndo();
+                        canvas->paste();
+                    }
+                }
                 // Ctrl+= / Ctrl+- zoom (center); Ctrl+0 resets to 100%.
                 // SDLK_EQUALS is the unshifted "=" key (the "+" key).
                 else if (ctrl && (k == SDLK_EQUALS || k == SDLK_PLUS || k == SDLK_KP_PLUS))

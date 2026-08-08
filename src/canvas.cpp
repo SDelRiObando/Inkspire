@@ -302,6 +302,85 @@ namespace Inkspire
         return surf;
     }
 
+    bool Canvas::copyActiveLayer()
+    {
+        // No selection yet: copy the whole active layer (the full canvas rect).
+        // When a selection tool arrives, it will call copyRegion() with the
+        // selection's bounding box instead; this stays the "nothing selected"
+        // fallback and needs no change.
+        return copyRegion({0, 0, width, height});
+    }
+
+    bool Canvas::copyRegion(const SDL_Rect &canvasRect)
+    {
+        if (!activeIsDrawable())
+            return false;
+
+        // Clamp the requested rect to the canvas so a selection that runs off
+        // an edge still copies the on-canvas part.
+        SDL_Rect r = canvasRect;
+        if (r.x < 0)
+        {
+            r.w += r.x;
+            r.x = 0;
+        }
+        if (r.y < 0)
+        {
+            r.h += r.y;
+            r.y = 0;
+        }
+        if (r.x + r.w > width)
+            r.w = width - r.x;
+        if (r.y + r.h > height)
+            r.h = height - r.y;
+        if (r.w <= 0 || r.h <= 0)
+            return false;
+
+        SDL_Surface *surf = SDL_CreateRGBSurfaceWithFormat(0, r.w, r.h, 32, SDL_PIXELFORMAT_RGBA8888);
+        if (!surf)
+            return false;
+
+        // Read just the requested sub-rect of the active layer's texture.
+        SDL_SetRenderTarget(renderer, layers[activeLayer].texture);
+        SDL_RenderReadPixels(renderer, &r, SDL_PIXELFORMAT_RGBA8888, surf->pixels, surf->pitch);
+        SDL_SetRenderTarget(renderer, nullptr);
+
+        // Replace any prior clipboard contents.
+        if (clipboard_.pixels)
+            SDL_FreeSurface(clipboard_.pixels);
+        clipboard_.pixels = surf;
+        clipboard_.srcRect = r;
+        return true;
+    }
+
+    bool Canvas::paste()
+    {
+        if (!clipboard_.pixels)
+            return false;
+
+        // A fresh, empty drawing layer above the active one.
+        addLayer(); // makes the new layer active
+        SDL_Texture *dst = layers[activeLayer].texture;
+        if (!dst)
+            return false;
+
+        // Blit the clipboard image back at the rect it came from, so a pasted
+        // selection lands exactly where it was copied (Photoshop "paste in
+        // place"). A whole-layer copy has a full-canvas rect, so it lands 1:1.
+        SDL_Texture *fromSurf = SDL_CreateTextureFromSurface(renderer, clipboard_.pixels);
+        if (fromSurf)
+        {
+            SDL_SetTextureBlendMode(fromSurf, SDL_BLENDMODE_NONE);
+            SDL_SetRenderTarget(renderer, dst);
+            SDL_Rect dstRect = clipboard_.srcRect;
+            SDL_RenderCopy(renderer, fromSurf, nullptr, &dstRect);
+            SDL_SetRenderTarget(renderer, nullptr);
+            SDL_DestroyTexture(fromSurf);
+        }
+        layers[activeLayer].name = "Pasted";
+        return true;
+    }
+
     SDL_Texture *Canvas::makeLayerTextureFromSurface(SDL_Surface *surf)
     {
         // Create a target texture and copy the surface into it
@@ -556,6 +635,11 @@ namespace Inkspire
         {
             SDL_DestroyTexture(strokeTex);
             strokeTex = nullptr;
+        }
+        if (clipboard_.pixels)
+        {
+            SDL_FreeSurface(clipboard_.pixels);
+            clipboard_.pixels = nullptr;
         }
     }
 

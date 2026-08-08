@@ -66,6 +66,21 @@ namespace Inkspire
         void setBackgroundColor(SDL_Color c);
         bool activeIsDrawable() const;
 
+        // ---- Clipboard (copy / paste) ----
+        // The clipboard holds a copied image plus the canvas rectangle it came
+        // from. Copying the whole active layer stores a full-canvas rect; once a
+        // selection tool exists, copyRegion() will store just the selection's
+        // bounding box, and paste() will drop it back at that same spot — so the
+        // same paste path serves both cases. copyActiveLayer() is the no-selection
+        // fallback (equivalent to copyRegion(full-canvas)).
+        //
+        // Returns false when there's nothing copyable (e.g. active layer isn't a
+        // drawing layer). paste() returns false when the clipboard is empty.
+        bool copyActiveLayer();
+        bool copyRegion(const SDL_Rect &canvasRect); // selection-aware copy
+        bool paste();                                // new layer above active
+        bool hasClipboard() const { return clipboard_.pixels != nullptr; }
+
         // Undo / redo. Callers invoke pushUndo() immediately BEFORE a mutating
         // action (one call per undoable unit of work). undo()/redo() restore
         // whole-document state and return true if anything changed.
@@ -106,6 +121,19 @@ namespace Inkspire
 
         std::vector<Snapshot> undoStack;
         std::vector<Snapshot> redoStack;
+
+        // ---- Clipboard ----
+        // A copied image and the canvas rect it occupied. `pixels` is an owned
+        // RGBA surface (freed on overwrite and in shutdown). `srcRect` is where
+        // it came from / where paste() places it. For a whole-layer copy the
+        // rect is the full canvas; for a future selection it's the selection's
+        // bounding box. Kept out of undo history — the clipboard survives undo.
+        struct Clipboard
+        {
+            SDL_Surface *pixels = nullptr; // owned; nullptr when empty
+            SDL_Rect srcRect{0, 0, 0, 0};  // canvas-space origin/size of the copy
+        };
+        Clipboard clipboard_;
 
         // Default cap on undo depth. More = more history but more memory/slower;
         // fewer = leaner and faster. Exposed via settings later; a constant for now.
